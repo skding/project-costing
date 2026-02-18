@@ -6,7 +6,7 @@ This guide outlines the steps to deploy the Project Costing application on an Or
 - OCI Compute Instance (Ubuntu/Oracle Linux)
 - PostgreSQL installed and running
 - Node.js (v20+) and npm installed
-- Nginx installed (for reverse proxy)
+- Nginx (Optional, if you prefer a domain name over IP:Port)
 
 ## 1. Database Configuration
 Ensure your PostgreSQL database is accessible by the application.
@@ -56,9 +56,18 @@ Ensure your PostgreSQL database is accessible by the application.
    ```bash
    npm run build
    ```
+3. Serve the production build on port **5173**:
+   Since you want to bypass Nginx and use port 5173 directly, install a simple static server like `serve`:
+   ```bash
+   sudo npm install -g serve
+   # Use PM2 to keep the frontend running on port 5173
+   pm2 start "serve -s dist -l 5173" --name costing-frontend
+   ```
+4. **Important**: Update the API connection. If your server is on port 3003, ensure the frontend can reach it at `http://your-cloud-ip:3003`.
    *Note: Ensure `VITE_API_BASE_URL` in your production environment points to your cloud IP/domain.*
 
-## 4. Nginx Reverse Proxy
+## 4. Nginx Reverse Proxy (Optional)
+This section is only needed if you want to use a domain name (e.g., `costing.yourdomain.com`) instead of `http://your-ip:5173`.
 Configure Nginx to serve the frontend and proxy API requests.
 1. Create a new configuration file `/etc/nginx/sites-available/project-costing`:
    ```nginx
@@ -93,8 +102,8 @@ Configure Nginx to serve the frontend and proxy API requests.
 
 ## 5. Security (OCI Console)
 1. Open the **Ingress Rules** in your VCN's Security List.
-2. Allow incoming traffic on port **80** (HTTP) and **443** (HTTPS if using SSL).
-3. (Optional) Disable port 3003/3002 if Nginx is handling the traffic.
+2. Allow incoming traffic on port **5173** (Frontend) and **3003** (Backend API).
+3. (Optional) Allow port **80** only if you are using Nginx.
 
 ## 6. Initial User Creation
 Since the app starts without users, you can run a script or use Prisma Studio to create the first admin user:
