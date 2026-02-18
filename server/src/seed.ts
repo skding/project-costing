@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-    const email = 'admin@example.com';
+    const email = 'admin@example.com'.toLowerCase();
     const password = 'Password123!';
     const name = 'Admin User';
 
