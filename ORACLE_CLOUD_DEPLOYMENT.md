@@ -52,9 +52,10 @@ Ensure your PostgreSQL database is accessible by the application.
    cd ../client
    npm install
    ```
-2. Build the production bundle:
+2. Build the production bundle with your cloud IP:
    ```bash
-   npm run build
+   # Replace <YOUR_CLOUD_IP> with your actual Oracle Cloud IP
+   VITE_API_URL="http://<YOUR_CLOUD_IP>:3003/api" npm run build
    ```
 3. Serve the production build on port **5173**:
    Since you want to bypass Nginx and use port 5173 directly, install a simple static server like `serve`:
