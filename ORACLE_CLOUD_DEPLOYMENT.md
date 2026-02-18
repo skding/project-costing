@@ -106,8 +106,30 @@ Configure Nginx to serve the frontend and proxy API requests.
 3. (Optional) Allow port **80** only if you are using Nginx.
 
 ## 6. Initial User Creation
-Since the app starts without users, you can run a script or use Prisma Studio to create the first admin user:
-```bash
-npx prisma studio
-```
-Navigate to the `User` table and add your initial credentials (reminder: passwords must be hashed if using SQL directly, use the app logic if possible).
+Since the app starts without users, the easiest way to create your first admin account is using the built-in seed script.
+
+1.  **Navigate to the server directory**:
+    ```bash
+    cd /var/www/project-costing/server
+    ```
+2.  **Run the seed script**:
+    ```bash
+    npx ts-node src/seed.ts
+    ```
+    *This will create a default user:*
+    - **Email**: `admin@example.com`
+    - **Password**: `Password123!`
+
+### Troubleshooting: "No database URL found"
+If you see an error about the database URL when running Prisma commands:
+- Ensure you are inside the `/var/www/project-costing/server` directory.
+- Verify that your `.env` file exists in that directory and contains the correct `DATABASE_URL`.
+- If you still have trouble, you can pass the URL directly to the command:
+  ```bash
+  DATABASE_URL="your_url_here" npx ts-node src/seed.ts
+  ```
+
+### Using Prisma Studio (Optional)
+If you specifically want to use the UI:
+1.  Run it from the server directory: `npx prisma studio`.
+2.  By default, it uses port **5555**. You must open this port in your **OCI Security List** (Ingress Rules) to access it via your browser.
