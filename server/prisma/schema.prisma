@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id        String    @id @default(uuid())
+  name      String
+  company   String?
+  createdAt DateTime  @default(now())
+  projects  Project[]
+}
+
+model Project {
+  id        String           @id @default(uuid())
+  name      String
+  location  String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  clientId  String?
+  client    Client?          @relation(fields: [clientId], references: [id])
+  versions  ProjectVersion[]
+}
+
+model ProjectVersion {
+  id            String             @id @default(uuid())
+  versionNumber Int
+  status        String             @default("DRAFT")
+  totalCost     Decimal            @default(0)
+  markup        Decimal            @default(1.0)
+  createdAt     DateTime           @default(now())
+  projectId     String
+  costSettings  CostSettings?
+  components    ProjectComponent[]
+  project       Project            @relation(fields: [projectId], references: [id])
+  systems       System[]
+
+  @@unique([projectId, versionNumber])
+}
+
+model System {
+  id               String         @id @default(uuid())
+  name             String
+  projectVersionId String
+  sections         Section[]
+  components       ProjectComponent[]
+  projectVersion   ProjectVersion @relation(fields: [projectVersionId], references: [id])
+  
+  // Site work costs
+  mandays         Decimal @default(0)
+  mobilization    Decimal @default(0)
+  lodging         Decimal @default(0)
+  documentation   Decimal @default(0)
+  training        Decimal @default(0)
+  siteWorkDetails Json?
+}
+
+model Section {
+  id             String          @id @default(uuid())
+  name           String
+  systemId       String
+  ioRequirements IORequirement[]
+  components     ProjectComponent[]
+  system         System          @relation(fields: [systemId], references: [id])
+
+  // Site work costs
+  mandays         Decimal @default(0)
+  mobilization    Decimal @default(0)
+  lodging         Decimal @default(0)
+  documentation   Decimal @default(0)
+  training        Decimal @default(0)
+  siteWorkDetails Json?
+}
+
+model IORequirement {
+  id        String  @id @default(uuid())
+  ioType    String
+  quantity  Int
+  sectionId String
+  section   Section @relation(fields: [sectionId], references: [id])
+}
+
+model ComponentCatalog {
+  id               String             @id @default(uuid())
+  model            String             @unique
+  description      String
+  brand            String
+  listPrice        Decimal
+  category         String
+  ioSpecs          Json?
+  projectComponents ProjectComponent[]
+}
+
+model ProjectComponent {
+  id               String         @id @default(uuid())
+  projectVersionId String
+  catalogId        String
+  catalog          ComponentCatalog @relation(fields: [catalogId], references: [id])
+  quantity         Int
+  snapshottedPrice Decimal
+  componentName    String?
+  
+  // Hierarchical links
+  systemId         String?
+  system           System?        @relation(fields: [systemId], references: [id])
+  sectionId        String?
+  section          Section?       @relation(fields: [sectionId], references: [id])
+
+  projectVersion   ProjectVersion @relation(fields: [projectVersionId], references: [id])
+}
+
+model CostSettings {
+  id                   String         @id @default(uuid())
+  projectVersionId     String         @unique
+  engRateDigital       Decimal        @default(0)
+  engRateAnalog        Decimal        @default(0)
+  engRateHLI           Decimal        @default(0)
+  siteWorkRates        Json?
+  cablingCostPerIO     Decimal        @default(0)
+  projectVersion       ProjectVersion @relation(fields: [projectVersionId], references: [id])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
