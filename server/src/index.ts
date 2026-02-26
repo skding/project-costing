@@ -5,13 +5,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3003;
+const port = process.env.PORT || 3002;
 
 import projectRoutes from './routes/projectRoutes';
 import versionRoutes from './routes/versionRoutes';
 import componentRoutes from './routes/componentRoutes';
 import clientRoutes from './routes/clientRoutes';
 import userRoutes from './routes/userRoutes';
+import equipmentRoutes from './routes/equipmentRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
 
 app.use(cors());
@@ -22,6 +23,7 @@ app.use('/api/projects', authMiddleware, projectRoutes);
 app.use('/api/versions', authMiddleware, versionRoutes);
 app.use('/api/components', authMiddleware, componentRoutes);
 app.use('/api/clients', authMiddleware, clientRoutes);
+app.use('/api/equipment', authMiddleware, equipmentRoutes);
 
 app.get('/', (req, res) => {
     res.send('Project Costing API is running');

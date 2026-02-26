@@ -12,10 +12,24 @@ interface IORequirement {
     quantity: number;
 }
 
+interface EquipmentIO {
+    id: string;
+    ioType: 'DI' | 'DO' | 'AI' | 'AO' | 'RTD' | 'HLI';
+    quantity: number;
+}
+
+interface Equipment {
+    id: string;
+    name: string;
+    quantity: number;
+    io: EquipmentIO[];
+}
+
 interface Section {
     id: string;
     name: string;
     ioRequirements: IORequirement[];
+    equipment: Equipment[];
     mandays: number;
     mobilization: number;
     lodging: number;
@@ -104,6 +118,17 @@ const calculateVersionTotals = (version: ProjectVersion) => {
                 if (io.ioType === 'DI' || io.ioType === 'DO') secDigital += io.quantity;
                 else if (io.ioType === 'AI' || io.ioType === 'AO' || io.ioType === 'RTD') secAnalog += io.quantity;
                 else if (io.ioType === 'HLI') secHli += io.quantity;
+            });
+
+            // Add IO from Equipment
+            (sec.equipment || []).forEach(eq => {
+                const eqQty = Number(eq.quantity) || 1;
+                eq.io.forEach(io => {
+                    const totalQty = io.quantity * eqQty;
+                    if (io.ioType === 'DI' || io.ioType === 'DO') secDigital += totalQty;
+                    else if (io.ioType === 'AI' || io.ioType === 'AO' || io.ioType === 'RTD') secAnalog += totalQty;
+                    else if (io.ioType === 'HLI') secHli += totalQty;
+                });
             });
 
             const secHardware = version.components
@@ -294,14 +319,21 @@ const ProjectEditor: React.FC = () => {
         if (!version) return;
         const totals = calculateVersionTotals(version);
 
-        // 1. IO Scope Sheet
+        // 1. IO Scope Sheet (Summated)
         const ioRows: any[] = [];
         version.systems.forEach(sys => {
             sys.sections.forEach(sec => {
                 const row: any = { System: sys.name, Section: sec.name };
                 ['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].forEach(type => {
-                    const req = sec.ioRequirements.find(r => r.ioType === type);
-                    row[type] = req ? req.quantity : 0;
+                    let total = sec.ioRequirements
+                        .filter(r => r.ioType === type)
+                        .reduce((acc, r) => acc + r.quantity, 0);
+
+                    sec.equipment?.forEach(eq => {
+                        eq.io.filter(i => i.ioType === type)
+                            .forEach(i => total += (i.quantity * eq.quantity));
+                    });
+                    row[type] = total;
                 });
                 ioRows.push(row);
             });
@@ -330,37 +362,83 @@ const ProjectEditor: React.FC = () => {
                 { f: `D${rowNum}*E${rowNum}` }
             ];
         });
-
         const bomSheet = XLSX.utils.aoa_to_sheet([BOM_COLS, ...bomData]);
 
-        // 3. Project Summary Sheet
-        const settings = version.costSettings || { engRateDigital: 0, engRateAnalog: 0, engRateHLI: 0, cablingCostPerIO: 0 };
-        const markupPercent = Number(version.markup || 25);
-        const margin = markupPercent / 100;
-        const grossPrice = margin < 1 ? totals.totalNet / (1 - margin) : totals.totalNet;
+        // 4. Equipment List Sheet
+        const eqCols = ["System", "Section", "Equipment Name", "Quantity", "DI", "DO", "AI", "AO", "RTD", "HLI"];
+        const eqData: any[] = [];
+        version.systems.forEach(sys => {
+            sys.sections.forEach(sec => {
+                sec.equipment?.forEach(eq => {
+                    const row: any[] = [sys.name, sec.name, eq.name, eq.quantity];
+                    ['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].forEach(type => {
+                        const io = eq.io.find(i => i.ioType === type);
+                        row.push(io ? io.quantity : 0);
+                    });
+                    eqData.push(row);
+                });
+            });
+        });
+        const eqSheet = XLSX.utils.aoa_to_sheet([eqCols, ...eqData]);
 
-        const summaryData = [
-            ["Project Costing Summary (RM)", ""],
+        // 3. Project Summary Sheet
+        const markupPercent = Number(version.markup || 0);
+        const margin = markupPercent / 100;
+        const getGross = (net: number) => Math.round(margin < 1 ? net / (1 - margin) : net);
+
+        const summaryData: any[] = [
+            ["Project Costing Summary", ""],
             ["", ""],
-            ["Description", "Value (RM)"],
-            ["Total IO Points", totals.totalIO],
-            ["Hardware Net Total", totals.hardwareCost],
-            ["Engineering: Digital (DI/DO)", totals.digital * settings.engRateDigital],
-            ["Engineering: Analog (AI/AO/RTD)", totals.analog * settings.engRateAnalog],
-            ["Engineering: HLI / Integration", totals.hli * settings.engRateHLI],
-            ["Cabling & Installation", totals.cablingCost],
-            ["Site Services (Mandays, Mob, etc)", totals.siteSubtotal],
+            ["Category", "Selling Price (RM)"],
+            ["Hardware Total", { v: getGross(totals.hardwareCost), t: 'n', z: '"RM"#,##0' }],
+            ["Engineering Total", { v: getGross(totals.engCost), t: 'n', z: '"RM"#,##0' }],
+            ["Cabling & Installation Total", { v: getGross(totals.cablingCost), t: 'n', z: '"RM"#,##0' }],
+            ["Site Implementation Total", { v: getGross(totals.siteSubtotal), t: 'n', z: '"RM"#,##0' }],
             ["", ""],
-            ["TOTAL NET COST", totals.totalNet],
-            ["Project Markup (Margin %)", markupPercent],
-            ["GROSS SELLING PRICE", grossPrice]
+            ["PROJECT SELLING PRICE", { v: getGross(totals.totalNet), t: 'n', z: '"RM"#,##0' }],
+            ["", ""],
+            ["", ""],
+            ["Section-wise Price Breakdown", ""],
+            ["Section Name", "Hardware", "Engineering", "Cabling", "Site Implementation", "Section Total"]
         ];
 
+        totals.hierarchy.forEach(sys => {
+            sys.sections.forEach(sec => {
+                const secSite = sec.breakdown.mandays + sec.breakdown.mobilization + sec.breakdown.lodging + sec.breakdown.documentation + sec.breakdown.training;
+                summaryData.push([
+                    sec.name,
+                    getGross(sec.breakdown.hardware),
+                    getGross(sec.breakdown.eng),
+                    getGross(sec.breakdown.cabling),
+                    getGross(secSite),
+                    getGross(sec.net)
+                ]);
+            });
+
+            // Add System Direct Costs if any
+            if (sys.directNet > 0) {
+                const sysDirectSite = sys.directBreakdown.mandays + sys.directBreakdown.mobilization + sys.directBreakdown.lodging + sys.directBreakdown.documentation + sys.directBreakdown.training;
+                summaryData.push([
+                    `(Direct) ${sys.name}`,
+                    getGross(sys.directBreakdown.hardware),
+                    0, // No direct eng/cabling usually at system level in this model
+                    0,
+                    getGross(sysDirectSite),
+                    getGross(sys.directNet)
+                ]);
+            }
+        });
+
         const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+
+        // Add some basic styling/formatting hints if possible (XLSX basic doesn't support much, but we can set column widths)
+        // Add some basic styling/formatting
+        summarySheet['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
         XLSX.utils.book_append_sheet(wb, ioSheet, "IO Scope");
         XLSX.utils.book_append_sheet(wb, bomSheet, "Bill of Materials");
+        if (eqData.length > 0) XLSX.utils.book_append_sheet(wb, eqSheet, "Equipment List");
 
         XLSX.writeFile(wb, `Pricing_Export_Rev${version.versionNumber}.xlsx`);
     };
@@ -510,27 +588,65 @@ const SectionEditor: React.FC<{
     section: Section;
     onUpdate: (id: string, reqs: IORequirement[]) => void
 }> = ({ section, onUpdate }) => {
-    const [isEditing, setIsEditing] = useState(false);
+    const [activeSectionTab, setActiveSectionTab] = useState<'signals' | 'equipment'>('signals');
+    const [isEditingIO, setIsEditingIO] = useState(false);
     const [requirements, setRequirements] = useState<IORequirement[]>(section.ioRequirements);
     const ioTypes = ['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'] as const;
 
-    const handleSave = () => {
+    // Equipment State
+    const [isAddingEquipment, setIsAddingEquipment] = useState(false);
+    const [newEqName, setNewEqName] = useState('');
+    const [newEqQty, setNewEqQty] = useState(1);
+    const [newEqIO, setNewEqIO] = useState<{ ioType: string, quantity: number }[]>([]);
+
+    useEffect(() => {
+        setRequirements(section.ioRequirements);
+    }, [section.ioRequirements]);
+
+    const handleSaveIO = () => {
         onUpdate(section.id, requirements);
-        setIsEditing(false);
+        setIsEditingIO(false);
     };
 
-    const addRow = () => {
+    const addIORow = () => {
         setRequirements([...requirements, { id: Math.random().toString(), ioType: 'DI', quantity: 0 }]);
     };
 
-    const updateRow = (index: number, field: keyof IORequirement, value: any) => {
+    const updateIORow = (index: number, field: keyof IORequirement, value: any) => {
         const newReqs = [...requirements];
         newReqs[index] = { ...newReqs[index], [field]: value };
         setRequirements(newReqs);
     };
 
-    const removeRow = (index: number) => {
+    const removeIORow = (index: number) => {
         setRequirements(requirements.filter((_, i) => i !== index));
+    };
+
+    const addEquipment = async () => {
+        if (!newEqName) return;
+        try {
+            // Using the correct endpoint based on index.ts (app.use('/api/equipment', equipmentRoutes))
+            // and equipmentRoutes.ts (router.post('/sections/:sectionId/equipment', ...))
+            await api.post(`/equipment/sections/${section.id}/equipment`, {
+                name: newEqName,
+                quantity: newEqQty,
+                io: newEqIO
+            });
+            // Trigger refresh - in a real app use a shared state or refetch details
+            window.location.reload(); // Quickest way to refresh everything for now
+        } catch (error) {
+            alert("Error adding equipment");
+        }
+    };
+
+    const deleteEquipment = async (id: string) => {
+        if (!confirm("Delete this equipment?")) return;
+        try {
+            await api.delete(`/equipment/${id}`);
+            window.location.reload();
+        } catch (error) {
+            alert("Error deleting equipment");
+        }
     };
 
     const groupedIO = section.ioRequirements.reduce((acc, curr) => {
@@ -538,66 +654,208 @@ const SectionEditor: React.FC<{
         return acc;
     }, {} as Record<string, number>);
 
+    // Total IO including equipment
+    const totalWithEq = { ...groupedIO };
+    (section.equipment || []).forEach(eq => {
+        eq.io.forEach(io => {
+            totalWithEq[io.ioType] = (totalWithEq[io.ioType] || 0) + (io.quantity * eq.quantity);
+        });
+    });
+
     return (
         <div className="py-2">
             <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-4">
                     <div className="h-4 w-4 rounded-full bg-blue-600 shadow-lg shadow-blue-200"></div>
-                    <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight">{section.name}</h4>
+                    <div className="flex flex-col">
+                        <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight">{section.name}</h4>
+                        <div className="flex gap-4 mt-2">
+                            <button
+                                onClick={() => setActiveSectionTab('signals')}
+                                className={cn("text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg transition-all",
+                                    activeSectionTab === 'signals' ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+                            >
+                                Base Signals
+                            </button>
+                            <button
+                                onClick={() => setActiveSectionTab('equipment')}
+                                className={cn("text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg transition-all",
+                                    activeSectionTab === 'equipment' ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+                            >
+                                Equipment Config ({section.equipment?.length || 0})
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className={cn("text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-sm",
-                        isEditing ? "bg-slate-200 text-slate-600" : "bg-white border-2 border-slate-100 text-blue-600 hover:border-blue-600")}
-                >
-                    {isEditing ? 'Discard Changes' : 'Configure Signals'}
-                </button>
+                {activeSectionTab === 'signals' && (
+                    <button
+                        onClick={() => setIsEditingIO(!isEditingIO)}
+                        className={cn("text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-sm",
+                            isEditingIO ? "bg-slate-200 text-slate-600" : "bg-white border-2 border-slate-100 text-blue-600 hover:border-blue-600")}
+                    >
+                        {isEditingIO ? 'Discard' : 'Configure Signals'}
+                    </button>
+                )}
             </div>
 
-            {!isEditing ? (
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 animate-in fade-in duration-500">
-                    {ioTypes.map(type => (
-                        <div key={type} className={cn("p-4 rounded-2xl border transition-all",
-                            groupedIO[type] > 0 ? "bg-white border-blue-100 shadow-sm ring-1 ring-blue-50" : "bg-slate-50/50 border-slate-100 opacity-60")}>
-                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{type}</div>
-                            <div className="text-xl font-black text-slate-900">{groupedIO[type] || 0}</div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="bg-slate-50/50 p-8 rounded-[2rem] border-2 border-slate-100 space-y-4 shadow-inner">
-                    <div className="grid grid-cols-1 gap-3">
-                        {requirements.map((req, idx) => (
-                            <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm animate-in slide-in-from-left-4 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                                <select
-                                    value={req.ioType}
-                                    onChange={(e) => updateRow(idx, 'ioType', e.target.value)}
-                                    className="border-none bg-slate-50 rounded-xl px-5 py-3 text-sm font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 w-40"
-                                >
-                                    {ioTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={req.quantity}
-                                    onChange={(e) => updateRow(idx, 'quantity', parseInt(e.target.value) || 0)}
-                                    className="border-none bg-slate-50 rounded-xl px-5 py-3 text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 w-32 text-center"
-                                />
-                                <div className="flex-1"></div>
-                                <button onClick={() => removeRow(idx)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                                    <Trash2 size={20} />
-                                </button>
+            {activeSectionTab === 'signals' ? (
+                !isEditingIO ? (
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 animate-in fade-in duration-500">
+                        {ioTypes.map(type => (
+                            <div key={type} className={cn("p-4 rounded-2xl border transition-all",
+                                totalWithEq[type] > 0 ? "bg-white border-blue-100 shadow-sm ring-1 ring-blue-50" : "bg-slate-50/50 border-slate-100 opacity-60")}>
+                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{type}</div>
+                                <div className="flex items-baseline gap-2">
+                                    <div className="text-xl font-black text-slate-900">{totalWithEq[type] || 0}</div>
+                                    {totalWithEq[type] > groupedIO[type] && (
+                                        <div className="text-[10px] font-bold text-blue-500">({groupedIO[type]}+{totalWithEq[type] - groupedIO[type]}eq)</div>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
-                    <div className="flex justify-between items-center mt-8 pt-8 border-t border-slate-200">
-                        <button onClick={addRow} className="flex items-center gap-2 bg-white text-slate-900 px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 border-slate-100 hover:border-slate-300 transition-all shadow-sm">
-                            <Plus size={16} /> New Signal Group
-                        </button>
-                        <button onClick={handleSave} className="flex items-center gap-3 bg-emerald-600 text-white px-10 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
-                            <Save size={18} /> Apply Logic
+                ) : (
+                    <div className="bg-slate-50/50 p-8 rounded-[2rem] border-2 border-slate-100 space-y-4 shadow-inner">
+                        <div className="grid grid-cols-1 gap-3">
+                            {requirements.map((req, idx) => (
+                                <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                                    <select
+                                        value={req.ioType}
+                                        onChange={(e) => updateIORow(idx, 'ioType', e.target.value as any)}
+                                        className="border-none bg-slate-50 rounded-xl px-5 py-3 text-sm font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 w-40"
+                                    >
+                                        {ioTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={req.quantity}
+                                        onChange={(e) => updateIORow(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                        className="border-none bg-slate-50 rounded-xl px-5 py-3 text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 w-32 text-center"
+                                    />
+                                    <div className="flex-1"></div>
+                                    <button onClick={() => removeIORow(idx)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-8 pt-8 border-t border-slate-200">
+                            <button onClick={addIORow} className="flex items-center gap-2 bg-white text-slate-900 px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 border-slate-100 hover:border-slate-300 transition-all shadow-sm">
+                                <Plus size={16} /> New Signal Group
+                            </button>
+                            <button onClick={handleSaveIO} className="flex items-center gap-3 bg-emerald-600 text-white px-10 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
+                                <Save size={18} /> Apply Logic
+                            </button>
+                        </div>
+                    </div>
+                )
+            ) : (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(section.equipment || []).map(eq => (
+                            <div key={eq.id} className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm group">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h5 className="font-black text-slate-900 uppercase tracking-tight">{eq.name}</h5>
+                                        <p className="text-[10px] font-bold text-slate-400">Qty: {eq.quantity}</p>
+                                    </div>
+                                    <button onClick={() => deleteEquipment(eq.id)} className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {eq.io.map((io, i) => (
+                                        <span key={i} className="text-[9px] font-black bg-slate-50 px-2 py-1 rounded-lg text-slate-500 border border-slate-100 uppercase">
+                                            {io.quantity} {io.ioType}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        <button
+                            onClick={() => setIsAddingEquipment(true)}
+                            className="border-2 border-dashed border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all group"
+                        >
+                            <Plus size={24} className="group-hover:scale-110 transition-transform" />
+                            <span className="text-[10px] font-black uppercase tracking-widest mt-2">Add New Equipment</span>
                         </button>
                     </div>
+
+                    {isAddingEquipment && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                            <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+                                <h3 className="text-2xl font-black text-slate-900 mb-8 uppercase tracking-tight">Configure New Equipment</h3>
+
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Equipment Name</label>
+                                        <input
+                                            type="text"
+                                            value={newEqName}
+                                            onChange={(e) => setNewEqName(e.target.value)}
+                                            placeholder="e.g. Pump Station Control"
+                                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Quantity</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={newEqQty}
+                                                onChange={(e) => setNewEqQty(parseInt(e.target.value) || 1)}
+                                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">IO Configuration (Per Unit)</label>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {ioTypes.map(type => (
+                                                <div key={type} className="space-y-2">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{type}</span>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="0"
+                                                        onChange={(e) => {
+                                                            const qty = parseInt(e.target.value) || 0;
+                                                            const existing = newEqIO.find(i => i.ioType === type);
+                                                            if (existing) {
+                                                                setNewEqIO(newEqIO.map(i => i.ioType === type ? { ...i, quantity: qty } : i));
+                                                            } else {
+                                                                setNewEqIO([...newEqIO, { ioType: type, quantity: qty }]);
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-12">
+                                    <button
+                                        onClick={() => setIsAddingEquipment(false)}
+                                        className="flex-1 py-4 bg-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={addEquipment}
+                                        className="flex-1 py-4 bg-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all hover:scale-[1.02] active:scale-95"
+                                    >
+                                        Add Equipment
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -648,8 +906,19 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     };
 
     const removeComponent = async (id: string) => {
+        if (!confirm("Remove this component?")) return;
         try {
             await api.delete(`/versions/components/${id}`);
+            onUpdate();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const updateComponentQty = async (id: string, qty: number) => {
+        if (qty < 1) return;
+        try {
+            await api.put(`/versions/components/${id}`, { quantity: qty });
             onUpdate();
         } catch (error) {
             console.error(error);
@@ -701,7 +970,11 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                 </div>
                                 {activeTarget?.type === 'project' && <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase">Targetting</span>}
                             </div>
-                            <ComponentsList components={version.components.filter(c => !c.systemId && !c.sectionId)} onRemove={removeComponent} />
+                            <ComponentsList
+                                components={version.components.filter(c => !c.systemId && !c.sectionId)}
+                                onRemove={removeComponent}
+                                onUpdateQty={updateComponentQty}
+                            />
                         </div>
 
                         {/* System Hierarchy */}
@@ -723,12 +996,25 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                         {activeTarget?.type === 'system' && activeTarget.id === sys.id && <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase">Targetting</span>}
                                     </div>
                                     {!collapsed.has(sys.id) && (
-                                        <ComponentsList components={version.components.filter(c => c.systemId === sys.id && !c.sectionId)} onRemove={removeComponent} />
+                                        <ComponentsList
+                                            components={version.components.filter(c => c.systemId === sys.id && !c.sectionId)}
+                                            onRemove={removeComponent}
+                                            onUpdateQty={updateComponentQty}
+                                        />
                                     )}
                                 </div>
 
                                 {!collapsed.has(sys.id) && sys.sections.map(sec => {
                                     const requiredIO = sec.ioRequirements.reduce((acc, curr) => ({ ...acc, [curr.ioType]: (acc[curr.ioType] || 0) + curr.quantity }), {} as any);
+
+                                    // Add IO from Equipment
+                                    (sec.equipment || []).forEach(eq => {
+                                        const eqQty = Number(eq.quantity) || 1;
+                                        eq.io.forEach(io => {
+                                            requiredIO[io.ioType] = (requiredIO[io.ioType] || 0) + (io.quantity * eqQty);
+                                        });
+                                    });
+
                                     const providedIO = calculateProvidedIO(sec.id);
 
                                     return (
@@ -787,7 +1073,11 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                         })}
                                                     </div>
 
-                                                    <ComponentsList components={version.components.filter(c => c.sectionId === sec.id)} onRemove={removeComponent} />
+                                                    <ComponentsList
+                                                        components={version.components.filter(c => c.sectionId === sec.id)}
+                                                        onRemove={removeComponent}
+                                                        onUpdateQty={updateComponentQty}
+                                                    />
                                                 </>
                                             )}
                                         </div>
@@ -858,20 +1148,51 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     );
 };
 
-const ComponentsList: React.FC<{ components: ProjectComponent[]; onRemove: (id: string) => void }> = ({ components, onRemove }) => (
-    <div className="space-y-2">
-        {components.length === 0 && <div className="text-[10px] text-slate-300 font-bold uppercase tracking-widest text-center py-4 border border-dashed border-slate-100 rounded-2xl">No items assigned</div>}
+const ComponentsList: React.FC<{
+    components: ProjectComponent[];
+    onRemove: (id: string) => void;
+    onUpdateQty?: (id: string, qty: number) => void;
+}> = ({ components, onRemove, onUpdateQty }) => (
+    <div className="space-y-3">
+        {components.length === 0 && <div className="text-[10px] text-slate-300 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-slate-50 rounded-3xl">No items assigned</div>}
         {components.map(c => (
-            <div key={c.id} className="flex items-center justify-between bg-white border border-slate-100 p-4 rounded-2xl group hover:shadow-md transition-all">
-                <div className="flex items-center gap-4">
-                    <div className="text-sm font-black text-slate-900">{c.quantity}x</div>
+            <div key={c.id} className="flex items-center justify-between bg-white border border-slate-100 p-5 rounded-[1.5rem] group hover:shadow-xl hover:border-blue-100 transition-all">
+                <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-center gap-1">
+                        {onUpdateQty && (
+                            <button
+                                onClick={() => onUpdateQty(c.id, c.quantity + 1)}
+                                className="p-1 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-md transition-all"
+                            >
+                                <ChevronDown size={14} className="rotate-180" />
+                            </button>
+                        )}
+                        <input
+                            type="number"
+                            min="1"
+                            value={c.quantity}
+                            onChange={(e) => onUpdateQty && onUpdateQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-12 text-center text-base font-black text-slate-900 py-1 bg-slate-50 rounded-lg border border-slate-100 outline-none focus:border-blue-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        {onUpdateQty && (
+                            <button
+                                onClick={() => onUpdateQty(c.id, Math.max(1, c.quantity - 1))}
+                                className="p-1 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-md transition-all"
+                            >
+                                <ChevronDown size={14} />
+                            </button>
+                        )}
+                    </div>
                     <div>
-                        <div className="text-sm font-black text-slate-800">{c.componentName}</div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{c.catalog.brand} • RM{Number(c.snapshottedPrice).toLocaleString()} ea</div>
+                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">{c.catalog.category}</div>
+                        <div className="text-sm font-black text-slate-800 uppercase tracking-tight">{c.componentName}</div>
+                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                            {c.catalog.brand} • RM{Number(c.snapshottedPrice).toLocaleString()} ea • <span className="text-slate-900 font-black">RM{(Number(c.snapshottedPrice) * c.quantity).toLocaleString()}</span>
+                        </div>
                     </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); onRemove(c.id); }} className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                    <Trash2 size={16} />
+                <button onClick={(e) => { e.stopPropagation(); onRemove(c.id); }} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                    <Trash2 size={20} />
                 </button>
             </div>
         ))}

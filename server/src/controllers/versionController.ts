@@ -8,16 +8,13 @@ export const getVersionDetails = async (req: Request, res: Response) => {
         const version = await prisma.projectVersion.findUnique({
             where: { id: id as string },
             include: {
-                project: {
-                    include: {
-                        client: true
-                    }
-                },
+                project: { include: { client: true } },
                 systems: {
                     include: {
                         sections: {
                             include: {
-                                ioRequirements: true
+                                ioRequirements: true,
+                                equipment: { include: { io: true } }
                             }
                         }
                     }
@@ -30,7 +27,7 @@ export const getVersionDetails = async (req: Request, res: Response) => {
                     }
                 },
                 costSettings: true
-            }
+            } as any
         });
         if (!version) return res.status(404).json({ error: 'Version not found' });
         res.json(version);
@@ -46,11 +43,11 @@ export const createNewVersion = async (req: Request, res: Response) => {
         const source = await prisma.projectVersion.findUnique({
             where: { id: sourceVersionId as string },
             include: {
-                systems: { include: { sections: { include: { ioRequirements: true } } } },
+                systems: { include: { sections: { include: { ioRequirements: true, equipment: { include: { io: true } } } } } },
                 components: true,
                 costSettings: true
-            }
-        });
+            } as any
+        }) as any;
 
         if (!source) return res.status(404).json({ error: 'Source version not found' });
 
@@ -99,6 +96,18 @@ export const createNewVersion = async (req: Request, res: Response) => {
                                         ioType: io.ioType,
                                         quantity: io.quantity
                                     }))
+                                },
+                                equipment: {
+                                    create: sec.equipment.map((eq: any) => ({
+                                        name: eq.name,
+                                        quantity: eq.quantity,
+                                        io: {
+                                            create: eq.io.map((io: any) => ({
+                                                ioType: io.ioType,
+                                                quantity: io.quantity
+                                            }))
+                                        }
+                                    }))
                                 }
                             }))
                         }
@@ -111,15 +120,11 @@ export const createNewVersion = async (req: Request, res: Response) => {
         });
 
         // Now map old components to new system/section IDs
-        // This is complex because we need to know which old ID corresponds to which new ID.
-        // Let's simplify: components will be copied but hierarchical links might need re-assignment or a more complex mapping.
-        // For now, let's just copy them without links to avoid breakage, OR implement the mapping.
-
         const systemMap = new Map();
-        source.systems.forEach((sys, idx) => {
-            const newSys = newVersion.systems[idx];
+        source.systems.forEach((sys: any, idx: number) => {
+            const newSys = (newVersion as any).systems[idx];
             systemMap.set(sys.id, newSys.id);
-            sys.sections.forEach((sec, sIdx) => {
+            sys.sections.forEach((sec: any, sIdx: number) => {
                 systemMap.set(sec.id, newSys.sections[sIdx].id);
             });
         });
@@ -312,6 +317,20 @@ export const updateSectionFields = async (req: Request, res: Response) => {
         res.json(section);
     } catch (error) {
         res.status(500).json({ error: 'Failed to update section' });
+    }
+};
+
+export const updateProjectComponent = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { quantity } = req.body;
+    try {
+        const updated = await prisma.projectComponent.update({
+            where: { id: id as string },
+            data: { quantity: Number(quantity) }
+        });
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update component' });
     }
 };
 

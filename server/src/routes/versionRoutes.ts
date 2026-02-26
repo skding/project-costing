@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { addSection, addSystem, getVersionDetails, updateIORequirements, addComponentToVersion, deleteProjectComponent, updateCostSettings, createNewVersion, updateSystem, updateSectionFields, updateVersion } from '../controllers/versionController';
+import { addSection, addSystem, getVersionDetails, updateIORequirements, addComponentToVersion, updateProjectComponent, deleteProjectComponent, updateCostSettings, createNewVersion, updateSystem, updateSectionFields, updateVersion } from '../controllers/versionController';
 
 const router = Router();
 
@@ -9,6 +9,7 @@ router.post('/:versionId/systems', addSystem);
 router.post('/systems/:systemId/sections', addSection);
 router.put('/sections/:sectionId/io', updateIORequirements);
 router.post('/:versionId/components', addComponentToVersion);
+router.put('/components/:id', updateProjectComponent);
 router.delete('/components/:id', deleteProjectComponent);
 router.put('/:versionId/settings', updateCostSettings);
 router.put('/:id', updateVersion);
