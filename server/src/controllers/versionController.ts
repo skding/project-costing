@@ -223,6 +223,7 @@ export const updateIORequirements = async (req: Request, res: Response) => {
 export const addComponentToVersion = async (req: Request, res: Response) => {
     const { versionId } = req.params;
     const { catalogId, quantity, systemId, sectionId, componentName, snapshottedPrice } = req.body;
+    console.log('[addComponentToVersion] Request Body:', req.body);
     try {
         let finalComponentName = componentName;
         let finalPrice = snapshottedPrice;
@@ -238,17 +239,17 @@ export const addComponentToVersion = async (req: Request, res: Response) => {
             data: {
                 projectVersionId: versionId as string,
                 catalogId: catalogId || null,
-                quantity: Number(quantity),
-                snapshottedPrice: finalPrice,
-                componentName: finalComponentName,
+                quantity: Number(quantity) || 1,
+                snapshottedPrice: finalPrice || 0,
+                componentName: finalComponentName || 'Unnamed Item',
                 systemId: systemId || null,
                 sectionId: sectionId || null
             }
         });
         res.json(projectComp);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to add component' });
+        console.error('[addComponentToVersion] Error:', error);
+        res.status(500).json({ error: 'Failed to add component', details: (error as any).message });
     }
 };
 

@@ -1028,8 +1028,9 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                 sectionId: activeTarget.type === 'section' ? activeTarget.id : null
             });
             onUpdate();
-        } catch (error) {
-            alert("Error adding misc item");
+        } catch (error: any) {
+            const msg = error.response?.data?.details || error.response?.data?.error || "Unknown Error";
+            alert(`Error adding misc item: ${msg}`);
         }
     };
 
