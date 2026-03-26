@@ -116,8 +116,8 @@ model ComponentCatalog {
 model ProjectComponent {
   id               String         @id @default(uuid())
   projectVersionId String
-  catalogId        String
-  catalog          ComponentCatalog @relation(fields: [catalogId], references: [id])
+  catalogId        String?
+  catalog          ComponentCatalog? @relation(fields: [catalogId], references: [id])
   quantity         Int
   snapshottedPrice Decimal
   componentName    String?

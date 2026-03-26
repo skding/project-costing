@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { Plus, Trash2, Save, ChevronDown, Download, Layers } from 'lucide-react';
+import { Plus, Trash2, Save, ChevronDown, Download, Layers, Edit2, Check, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
 
@@ -50,19 +50,19 @@ interface System {
 
 interface ProjectComponent {
     id: string;
-    catalogId: string;
+    catalogId?: string | null;
     quantity: number;
     snapshottedPrice: string | number;
     componentName: string;
     category?: string;
     systemId?: string | null;
     sectionId?: string | null;
-    catalog: {
+    catalog?: {
         model: string;
         brand: string;
         ioSpecs: any;
         category: string;
-    };
+    } | null;
 }
 
 interface ProjectVersion {
@@ -234,6 +234,9 @@ const ProjectEditor: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'definition' | 'hardware' | 'summary' | 'site'>('definition');
 
     useEffect(() => {
+        setLoading(true);
+        // Clear expanded systems so the new version's IDs can be mapped
+        setExpandedSystems(new Set());
         fetchVersionDetails();
         fetchProjectVersions();
     }, [versionId]);
@@ -242,8 +245,8 @@ const ProjectEditor: React.FC = () => {
         try {
             const res = await api.get(`/versions/${versionId}`);
             setVersion(res.data);
-            // Default expand systems if none expanded
-            if (expandedSystems.size === 0 && res.data.systems.length > 0) {
+            // Default expand systems for the new version
+            if (res.data.systems.length > 0) {
                 setExpandedSystems(new Set(res.data.systems.map((s: any) => s.id)));
             }
         } catch (error) {
@@ -354,7 +357,7 @@ const ProjectEditor: React.FC = () => {
             }
 
             return [
-                c.catalog.category,
+                c.catalog?.category || 'Misc',
                 hierarchy,
                 c.componentName,
                 c.quantity,
@@ -577,12 +580,15 @@ const ProjectEditor: React.FC = () => {
                 {activeTab === 'hardware' && <AdvancedBOM version={version} onUpdate={fetchVersionDetails} />}
                 {activeTab === 'site' && <SiteSettings version={version} onUpdate={fetchVersionDetails} />}
                 {activeTab === 'summary' && <CostSummary version={version} onUpdate={fetchVersionDetails} />}
+
             </div>
         </div>
     );
 };
 
 // --- Subcomponents ---
+
+// ... (types)
 
 const SectionEditor: React.FC<{
     section: Section;
@@ -593,8 +599,13 @@ const SectionEditor: React.FC<{
     const [requirements, setRequirements] = useState<IORequirement[]>(section.ioRequirements);
     const ioTypes = ['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'] as const;
 
+    // Section Name Editing
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState(section.name);
+
     // Equipment State
     const [isAddingEquipment, setIsAddingEquipment] = useState(false);
+    const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
     const [newEqName, setNewEqName] = useState('');
     const [newEqQty, setNewEqQty] = useState(1);
     const [newEqIO, setNewEqIO] = useState<{ ioType: string, quantity: number }[]>([]);
@@ -606,6 +617,20 @@ const SectionEditor: React.FC<{
     const handleSaveIO = () => {
         onUpdate(section.id, requirements);
         setIsEditingIO(false);
+    };
+
+    const handleUpdateSectionName = async () => {
+        if (!editedName || editedName === section.name) {
+            setIsEditingName(false);
+            return;
+        }
+        try {
+            await api.put(`/versions/sections/${section.id}/fields`, { name: editedName });
+            setIsEditingName(false);
+            window.location.reload();
+        } catch (error) {
+            alert("Error updating section name");
+        }
     };
 
     const addIORow = () => {
@@ -625,17 +650,45 @@ const SectionEditor: React.FC<{
     const addEquipment = async () => {
         if (!newEqName) return;
         try {
-            // Using the correct endpoint based on index.ts (app.use('/api/equipment', equipmentRoutes))
-            // and equipmentRoutes.ts (router.post('/sections/:sectionId/equipment', ...))
             await api.post(`/equipment/sections/${section.id}/equipment`, {
                 name: newEqName,
                 quantity: newEqQty,
                 io: newEqIO
             });
-            // Trigger refresh - in a real app use a shared state or refetch details
-            window.location.reload(); // Quickest way to refresh everything for now
+            setIsAddingEquipment(false);
+            setNewEqName('');
+            setNewEqQty(1);
+            setNewEqIO([]);
+            window.location.reload();
         } catch (error) {
             alert("Error adding equipment");
+        }
+    };
+
+    const handleEditEquipment = (eq: any) => {
+        setEditingEquipmentId(eq.id);
+        setNewEqName(eq.name);
+        setNewEqQty(eq.quantity);
+        setNewEqIO(eq.io.map((i: any) => ({ ioType: i.ioType, quantity: i.quantity })));
+        setIsAddingEquipment(true);
+    };
+
+    const handleUpdateEquipment = async () => {
+        if (!newEqName || !editingEquipmentId) return;
+        try {
+            await api.put(`/equipment/${editingEquipmentId}`, {
+                name: newEqName,
+                quantity: newEqQty,
+                io: newEqIO
+            });
+            setIsAddingEquipment(false);
+            setEditingEquipmentId(null);
+            setNewEqName('');
+            setNewEqQty(1);
+            setNewEqIO([]);
+            window.location.reload();
+        } catch (error) {
+            alert("Error updating equipment");
         }
     };
 
@@ -668,7 +721,35 @@ const SectionEditor: React.FC<{
                 <div className="flex items-center gap-4">
                     <div className="h-4 w-4 rounded-full bg-blue-600 shadow-lg shadow-blue-200"></div>
                     <div className="flex flex-col">
-                        <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight">{section.name}</h4>
+                        {isEditingName ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={editedName}
+                                    onChange={(e) => setEditedName(e.target.value)}
+                                    className="font-black text-slate-900 text-lg uppercase tracking-tight border-b-2 border-blue-600 outline-none bg-transparent"
+                                    autoFocus
+                                    onBlur={handleUpdateSectionName}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateSectionName()}
+                                />
+                                <button onClick={handleUpdateSectionName} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-md">
+                                    <Check size={18} />
+                                </button>
+                                <button onClick={() => { setIsEditingName(false); setEditedName(section.name); }} className="p-1 text-red-600 hover:bg-red-50 rounded-md">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 group">
+                                <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight">{section.name}</h4>
+                                <button
+                                    onClick={() => setIsEditingName(true)}
+                                    className="p-1 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                    <Edit2 size={14} />
+                                </button>
+                            </div>
+                        )}
                         <div className="flex gap-4 mt-2">
                             <button
                                 onClick={() => setActiveSectionTab('signals')}
@@ -760,9 +841,20 @@ const SectionEditor: React.FC<{
                                         <h5 className="font-black text-slate-900 uppercase tracking-tight">{eq.name}</h5>
                                         <p className="text-[10px] font-bold text-slate-400">Qty: {eq.quantity}</p>
                                     </div>
-                                    <button onClick={() => deleteEquipment(eq.id)} className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => handleEditEquipment(eq)}
+                                            className="p-2 text-slate-200 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => deleteEquipment(eq.id)}
+                                            className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     {eq.io.map((io, i) => (
@@ -785,8 +877,18 @@ const SectionEditor: React.FC<{
 
                     {isAddingEquipment && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                            <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl animate-in zoom-in-95 duration-300">
-                                <h3 className="text-2xl font-black text-slate-900 mb-8 uppercase tracking-tight">Configure New Equipment</h3>
+                            <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+                                <div className="flex justify-between items-center mb-8">
+                                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+                                        {editingEquipmentId ? 'Edit Equipment' : 'Configure New Equipment'}
+                                    </h3>
+                                    <button
+                                        onClick={() => { setIsAddingEquipment(false); setEditingEquipmentId(null); setNewEqName(''); setNewEqQty(1); setNewEqIO([]); }}
+                                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                                    >
+                                        <X size={24} />
+                                    </button>
+                                </div>
 
                                 <div className="space-y-6">
                                     <div>
@@ -839,18 +941,18 @@ const SectionEditor: React.FC<{
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4 mt-12">
+                                <div className="flex justify-end gap-4 mt-10">
                                     <button
-                                        onClick={() => setIsAddingEquipment(false)}
-                                        className="flex-1 py-4 bg-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 transition-all"
+                                        onClick={() => { setIsAddingEquipment(false); setEditingEquipmentId(null); setNewEqName(''); setNewEqQty(1); setNewEqIO([]); }}
+                                        className="px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all font-sans"
                                     >
                                         Cancel
                                     </button>
                                     <button
-                                        onClick={addEquipment}
-                                        className="flex-1 py-4 bg-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all hover:scale-[1.02] active:scale-95"
+                                        onClick={editingEquipmentId ? handleUpdateEquipment : addEquipment}
+                                        className="px-10 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 font-sans"
                                     >
-                                        Add Equipment
+                                        {editingEquipmentId ? 'Update Configuration' : 'Save Configuration'}
                                     </button>
                                 </div>
                             </div>
@@ -905,6 +1007,32 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
         }
     };
 
+    const addMiscItem = async () => {
+        if (!activeTarget) {
+            alert("Select a Target first!");
+            return;
+        }
+        const description = prompt("Item Description:");
+        if (!description) return;
+        const qty = prompt("Quantity:", "1");
+        if (!qty) return;
+        const price = prompt("Unit Price (RM):", "0");
+        if (price === null) return;
+
+        try {
+            await api.post(`/versions/${version.id}/components`, {
+                componentName: description,
+                quantity: Number(qty),
+                snapshottedPrice: Number(price),
+                systemId: activeTarget.type === 'system' ? activeTarget.id : null,
+                sectionId: activeTarget.type === 'section' ? activeTarget.id : null
+            });
+            onUpdate();
+        } catch (error) {
+            alert("Error adding misc item");
+        }
+    };
+
     const removeComponent = async (id: string) => {
         if (!confirm("Remove this component?")) return;
         try {
@@ -925,13 +1053,22 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
         }
     };
 
+    const updateComponentItem = async (id: string, fields: any) => {
+        try {
+            await api.put(`/versions/components/${id}`, fields);
+            onUpdate();
+        } catch (error) {
+            alert("Error updating item");
+        }
+    };
+
     // Calculate aggregated IO provided by components for each section
     const calculateProvidedIO = (sectionId: string) => {
         const sectionComponents = version.components.filter(c => c.sectionId === sectionId);
         const provided: Record<string, number> = { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 };
 
         sectionComponents.forEach(c => {
-            const specs = c.catalog.ioSpecs || {};
+            const specs = c.catalog?.ioSpecs || {};
             Object.entries(specs).forEach(([type, count]) => {
                 const numCount = typeof count === 'number' ? count : parseInt(count as string) || 0;
                 provided[type] = (provided[type] || 0) + (numCount * c.quantity);
@@ -947,9 +1084,17 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                 <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
                     <div className="p-8 border-b border-slate-50 flex justify-between items-center">
                         <h3 className="text-xl font-black text-slate-900 tracking-tight">Structured Bill of Materials</h3>
-                        <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                            <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-                            <span className="text-[10px] font-black uppercase text-slate-500">Live Assignment Mode</span>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={addMiscItem}
+                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md"
+                            >
+                                <Plus size={14} /> Add Misc. Item
+                            </button>
+                            <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                                <span className="text-[10px] font-black uppercase text-slate-500">Live Assignment Mode</span>
+                            </div>
                         </div>
                     </div>
 
@@ -974,6 +1119,7 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                 components={version.components.filter(c => !c.systemId && !c.sectionId)}
                                 onRemove={removeComponent}
                                 onUpdateQty={updateComponentQty}
+                                onUpdateItem={updateComponentItem}
                             />
                         </div>
 
@@ -1000,6 +1146,7 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                             components={version.components.filter(c => c.systemId === sys.id && !c.sectionId)}
                                             onRemove={removeComponent}
                                             onUpdateQty={updateComponentQty}
+                                            onUpdateItem={updateComponentItem}
                                         />
                                     )}
                                 </div>
@@ -1048,6 +1195,18 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                             const diff = prov - req;
                                                             const perc = req > 0 ? (prov / req) * 100 : 0;
 
+                                                            const getStatusColor = () => {
+                                                                if (perc < 100) return 'red';
+                                                                if (perc < 130) return 'amber';
+                                                                return 'emerald';
+                                                            };
+                                                            const color = getStatusColor();
+                                                            const colorClasses = {
+                                                                red: 'text-red-500 bg-red-500 bg-red-50',
+                                                                amber: 'text-amber-500 bg-amber-500 bg-amber-50',
+                                                                emerald: 'text-emerald-600 bg-emerald-500 bg-emerald-50'
+                                                            };
+
                                                             return (
                                                                 <div key={type} className={cn("p-4 rounded-2xl border transition-all",
                                                                     req > 0 ? "bg-slate-50 border-slate-100" : "bg-white border-slate-50 opacity-40")}>
@@ -1055,14 +1214,14 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                                     <div className="space-y-1">
                                                                         <div className="flex justify-between text-[10px] font-bold">
                                                                             <span className="text-slate-500">Req: {req}</span>
-                                                                            <span className={prov >= req ? "text-emerald-600" : "text-red-500"}>Prov: {prov}</span>
+                                                                            <span className={colorClasses[color].split(' ')[0]}>Prov: {prov}</span>
                                                                         </div>
                                                                         <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-                                                                            <div className={cn("h-full transition-all", prov >= req ? "bg-emerald-500" : "bg-red-500")} style={{ width: `${Math.min(perc, 100)}%` }}></div>
+                                                                            <div className={cn("h-full transition-all", colorClasses[color].split(' ')[1])} style={{ width: `${Math.min(perc, 100)}%` }}></div>
                                                                         </div>
                                                                         <div className="flex justify-between items-center mt-2">
                                                                             <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded-md",
-                                                                                diff >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600")}>
+                                                                                colorClasses[color].split(' ')[2], colorClasses[color].split(' ')[0])}>
                                                                                 {diff >= 0 ? `+${diff}` : diff} Spare
                                                                             </span>
                                                                             {req > 0 && <span className="text-[8px] font-medium text-slate-400">{perc.toFixed(0)}%</span>}
@@ -1077,6 +1236,7 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                         components={version.components.filter(c => c.sectionId === sec.id)}
                                                         onRemove={removeComponent}
                                                         onUpdateQty={updateComponentQty}
+                                                        onUpdateItem={updateComponentItem}
                                                     />
                                                 </>
                                             )}
@@ -1152,52 +1312,79 @@ const ComponentsList: React.FC<{
     components: ProjectComponent[];
     onRemove: (id: string) => void;
     onUpdateQty?: (id: string, qty: number) => void;
-}> = ({ components, onRemove, onUpdateQty }) => (
-    <div className="space-y-3">
-        {components.length === 0 && <div className="text-[10px] text-slate-300 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-slate-50 rounded-3xl">No items assigned</div>}
-        {components.map(c => (
-            <div key={c.id} className="flex items-center justify-between bg-white border border-slate-100 p-5 rounded-[1.5rem] group hover:shadow-xl hover:border-blue-100 transition-all">
-                <div className="flex items-center gap-6">
-                    <div className="flex flex-col items-center gap-1">
-                        {onUpdateQty && (
-                            <button
-                                onClick={() => onUpdateQty(c.id, c.quantity + 1)}
-                                className="p-1 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-md transition-all"
-                            >
-                                <ChevronDown size={14} className="rotate-180" />
-                            </button>
-                        )}
-                        <input
-                            type="number"
-                            min="1"
-                            value={c.quantity}
-                            onChange={(e) => onUpdateQty && onUpdateQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-12 text-center text-base font-black text-slate-900 py-1 bg-slate-50 rounded-lg border border-slate-100 outline-none focus:border-blue-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        {onUpdateQty && (
-                            <button
-                                onClick={() => onUpdateQty(c.id, Math.max(1, c.quantity - 1))}
-                                className="p-1 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-md transition-all"
-                            >
-                                <ChevronDown size={14} />
-                            </button>
-                        )}
-                    </div>
-                    <div>
-                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">{c.catalog.category}</div>
-                        <div className="text-sm font-black text-slate-800 uppercase tracking-tight">{c.componentName}</div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                            {c.catalog.brand} • RM{Number(c.snapshottedPrice).toLocaleString()} ea • <span className="text-slate-900 font-black">RM{(Number(c.snapshottedPrice) * c.quantity).toLocaleString()}</span>
+    onUpdateItem?: (id: string, fields: any) => void;
+}> = ({ components, onRemove, onUpdateQty, onUpdateItem }) => {
+    const handleUpdateMisc = (id: string, currentName: string, currentPrice: number | string) => {
+        const newName = prompt("Update Description:", currentName);
+        if (newName === null) return;
+        const newPrice = prompt("Update Unit Price (RM):", String(currentPrice));
+        if (newPrice === null) return;
+
+        if (onUpdateItem) {
+            onUpdateItem(id, {
+                componentName: newName,
+                snapshottedPrice: Number(newPrice)
+            });
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            {components.length === 0 && <div className="text-[10px] text-slate-300 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-slate-50 rounded-3xl">No items assigned</div>}
+            {components.map(c => (
+                <div key={c.id} className="flex items-center justify-between bg-white border border-slate-100 p-5 rounded-[1.5rem] group hover:shadow-xl hover:border-blue-100 transition-all">
+                    <div className="flex items-center gap-6">
+                        <div className="flex flex-col items-center gap-1">
+                            {onUpdateQty && (
+                                <button
+                                    onClick={() => onUpdateQty(c.id, c.quantity + 1)}
+                                    className="p-1 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-md transition-all"
+                                >
+                                    <ChevronDown size={14} className="rotate-180" />
+                                </button>
+                            )}
+                            <input
+                                type="number"
+                                min="1"
+                                value={c.quantity}
+                                onChange={(e) => onUpdateQty && onUpdateQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-12 text-center text-base font-black text-slate-900 py-1 bg-slate-50 rounded-lg border border-slate-100 outline-none focus:border-blue-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            {onUpdateQty && (
+                                <button
+                                    onClick={() => onUpdateQty(c.id, Math.max(1, c.quantity - 1))}
+                                    className="p-1 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-md transition-all"
+                                >
+                                    <ChevronDown size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-0.5">{c.catalog?.category || 'Misc'}</div>
+                                {!c.catalogId && (
+                                    <button
+                                        onClick={() => handleUpdateMisc(c.id, c.componentName, c.snapshottedPrice)}
+                                        className="p-1 px-2 text-[8px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-md hover:bg-slate-200"
+                                    >
+                                        Edit Details
+                                    </button>
+                                )}
+                            </div>
+                            <div className="text-sm font-black text-slate-800 uppercase tracking-tight">{c.componentName}</div>
+                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                {c.catalog?.brand || 'Generic'} • RM{Number(c.snapshottedPrice).toLocaleString()} ea • <span className="text-slate-900 font-black">RM{(Number(c.snapshottedPrice) * c.quantity).toLocaleString()}</span>
+                            </div>
                         </div>
                     </div>
+                    <button onClick={(e) => { e.stopPropagation(); onRemove(c.id); }} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                        <Trash2 size={20} />
+                    </button>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); onRemove(c.id); }} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                    <Trash2 size={20} />
-                </button>
-            </div>
-        ))}
-    </div>
-);
+            ))}
+        </div>
+    );
+};
 
 const SiteSettings: React.FC<{ version: ProjectVersion; onUpdate: () => void }> = ({ version, onUpdate }) => {
     const [settings, setSettings] = useState(() => {

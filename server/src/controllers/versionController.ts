@@ -222,18 +222,25 @@ export const updateIORequirements = async (req: Request, res: Response) => {
 // Add component to version (supports hierarchical assignment)
 export const addComponentToVersion = async (req: Request, res: Response) => {
     const { versionId } = req.params;
-    const { catalogId, quantity, systemId, sectionId } = req.body;
+    const { catalogId, quantity, systemId, sectionId, componentName, snapshottedPrice } = req.body;
     try {
-        const catalogItem = await prisma.componentCatalog.findUnique({ where: { id: catalogId } });
-        if (!catalogItem) return res.status(404).json({ error: 'Catalog item not found' });
+        let finalComponentName = componentName;
+        let finalPrice = snapshottedPrice;
+
+        if (catalogId) {
+            const catalogItem = await prisma.componentCatalog.findUnique({ where: { id: catalogId } });
+            if (!catalogItem) return res.status(404).json({ error: 'Catalog item not found' });
+            finalComponentName = catalogItem.model;
+            finalPrice = catalogItem.listPrice;
+        }
 
         const projectComp = await prisma.projectComponent.create({
             data: {
                 projectVersionId: versionId as string,
-                catalogId: catalogId as string,
-                quantity: quantity,
-                snapshottedPrice: catalogItem.listPrice,
-                componentName: catalogItem.model,
+                catalogId: catalogId || null,
+                quantity: Number(quantity),
+                snapshottedPrice: finalPrice,
+                componentName: finalComponentName,
                 systemId: systemId || null,
                 sectionId: sectionId || null
             }
@@ -322,11 +329,15 @@ export const updateSectionFields = async (req: Request, res: Response) => {
 
 export const updateProjectComponent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { quantity } = req.body;
+    const { quantity, componentName, snapshottedPrice } = req.body;
     try {
         const updated = await prisma.projectComponent.update({
             where: { id: id as string },
-            data: { quantity: Number(quantity) }
+            data: { 
+                quantity: quantity !== undefined ? Number(quantity) : undefined,
+                componentName: componentName,
+                snapshottedPrice: snapshottedPrice !== undefined ? Number(snapshottedPrice) : undefined
+            }
         });
         res.json(updated);
     } catch (error) {

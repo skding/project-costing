@@ -17,6 +17,11 @@ const ComponentLibrary: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+
     const [newComp, setNewComp] = useState({
         model: '',
         description: '',
@@ -26,7 +31,8 @@ const ComponentLibrary: React.FC = () => {
         ioSpecs: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
     });
 
-    const categories = ['PLC', 'HMI', 'NETWORK', 'SCADA', 'SITE', 'HARDWARE', 'ENGINEERING'];
+    const defaultCategories = ['PLC', 'HMI', 'NETWORK', 'SCADA', 'SITE', 'HARDWARE', 'ENGINEERING'];
+    const [availableCategories, setAvailableCategories] = useState<string[]>(defaultCategories);
 
     useEffect(() => {
         fetchComponents();
@@ -36,12 +42,30 @@ const ComponentLibrary: React.FC = () => {
         try {
             const res = await api.get('/components');
             setComponents(res.data);
+
+            // Extract unique categories and merge with defaults
+            const uniqueCats = Array.from(new Set([
+                ...defaultCategories,
+                ...res.data.map((c: Component) => c.category)
+            ])).filter(Boolean).sort();
+            setAvailableCategories(uniqueCats);
         } catch (error) {
             console.error('Error fetching components', error);
         } finally {
             setLoading(false);
         }
     };
+
+    const filteredComponents = components.filter(comp => {
+        const matchesSearch =
+            comp.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            comp.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            comp.description.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesCategory = selectedCategory === 'All' || comp.category === selectedCategory;
+
+        return matchesSearch && matchesCategory;
+    });
 
     const handleEdit = (comp: Component) => {
         setEditingId(comp.id);
@@ -59,13 +83,20 @@ const ComponentLibrary: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            const finalComp = { ...newComp };
+            if (isAddingNewCategory && newCategoryName.trim()) {
+                finalComp.category = newCategoryName.trim();
+            }
+
             if (editingId) {
-                await api.put(`/components/${editingId}`, newComp);
+                await api.put(`/components/${editingId}`, finalComp);
             } else {
-                await api.post('/components', newComp);
+                await api.post('/components', finalComp);
             }
             setIsAdding(false);
             setEditingId(null);
+            setIsAddingNewCategory(false);
+            setNewCategoryName('');
             fetchComponents();
             setNewComp({
                 model: '',
@@ -128,6 +159,34 @@ const ComponentLibrary: React.FC = () => {
                 </button>
             </div>
 
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-xl border shadow-sm">
+                <div className="relative flex-1 w-full">
+                    <input
+                        type="text"
+                        placeholder="Search by model, brand, or description..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Filter:</span>
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
+                    >
+                        <option value="All">All Categories</option>
+                        {availableCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-2 rounded-lg">
+                    {filteredComponents.length} {filteredComponents.length === 1 ? 'Item' : 'Items'} Found
+                </div>
+            </div>
+
             {isAdding && (
                 <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-lg animate-in fade-in zoom-in duration-200">
                     <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Hardware Component' : 'New Hardware Component'}</h3>
@@ -146,9 +205,46 @@ const ComponentLibrary: React.FC = () => {
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Category</label>
-                            <select value={newComp.category} onChange={e => setNewComp({ ...newComp, category: e.target.value })} className="w-full border rounded-md px-3 py-2">
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                            <div className="flex gap-2">
+                                {!isAddingNewCategory ? (
+                                    <>
+                                        <select
+                                            value={newComp.category}
+                                            onChange={e => setNewComp({ ...newComp, category: e.target.value })}
+                                            className="w-full border rounded-md px-3 py-2"
+                                        >
+                                            {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAddingNewCategory(true)}
+                                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md text-xs font-bold whitespace-nowrap"
+                                        >
+                                            + New
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <input
+                                            autoFocus
+                                            placeholder="Enter category name..."
+                                            value={newCategoryName}
+                                            onChange={e => setNewCategoryName(e.target.value)}
+                                            className="w-full border rounded-md px-3 py-2"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsAddingNewCategory(false);
+                                                setNewCategoryName('');
+                                            }}
+                                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md text-xs font-bold"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">List Price (RM)</label>
@@ -199,7 +295,7 @@ const ComponentLibrary: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {components.map((comp) => (
+                            {filteredComponents.map((comp) => (
                                 <tr key={comp.id} className="hover:bg-slate-50/50 transition-colors group">
                                     <td className="px-6 py-4">
                                         <div className="font-semibold text-slate-900">{comp.model}</div>
@@ -233,10 +329,10 @@ const ComponentLibrary: React.FC = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {components.length === 0 && (
+                            {filteredComponents.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
-                                        Catalog is empty. Add components to begin.
+                                        {components.length === 0 ? 'Catalog is empty. Add components to begin.' : 'No components match your search/filter.'}
                                     </td>
                                 </tr>
                             )}
