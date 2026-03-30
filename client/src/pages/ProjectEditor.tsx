@@ -214,11 +214,14 @@ const calculateVersionTotals = (version: ProjectVersion) => {
 
     const engCost = (digital * rates.engRateDigital) + (analog * rates.engRateAnalog) + (hli * rates.engRateHLI);
     const cablingCost = (digital + analog + hli) * rates.cablingCostPerIO;
+    const projectLevelHardwareCost = version.components
+        .filter(c => !c.systemId && !c.sectionId)
+        .reduce((acc, c) => acc + (Number(c.snapshottedPrice) * c.quantity), 0);
     const hardwareCost = version.components.reduce((acc, c) => acc + (Number(c.snapshottedPrice) * c.quantity), 0);
 
     return {
         digital, analog, hli, totalIO: digital + analog + hli,
-        engCost, cablingCost, siteSubtotal, hardwareCost,
+        engCost, cablingCost, siteSubtotal, hardwareCost, projectLevelHardwareCost,
         totalNet: engCost + cablingCost + siteSubtotal + hardwareCost,
         hierarchy
     };
@@ -406,6 +409,16 @@ const ProjectEditor: React.FC = () => {
         ];
 
         totals.hierarchy.forEach(sys => {
+            // Add Project Level Hardware if this is the first iteration and cost exists
+            if (totals.projectLevelHardwareCost > 0 && summaryData.length === 15) {
+                summaryData.push([
+                    "Project Level Hardware",
+                    getGross(totals.projectLevelHardwareCost),
+                    0, 0, 0,
+                    getGross(totals.projectLevelHardwareCost)
+                ]);
+            }
+
             sys.sections.forEach(sec => {
                 const secSite = sec.breakdown.mandays + sec.breakdown.mobilization + sec.breakdown.lodging + sec.breakdown.documentation + sec.breakdown.training;
                 summaryData.push([
@@ -1747,6 +1760,21 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
+                            {totals.projectLevelHardwareCost > 0 && (
+                                <tr className="group hover:bg-slate-50/50 transition-colors bg-blue-50/20 italic text-[11px]">
+                                    <td className="py-4 pr-4">
+                                        <div className="font-black text-blue-900 uppercase text-sm tracking-tight">Project Level Hardware</div>
+                                        <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest text-xs">Global Items</div>
+                                    </td>
+                                    <td className="py-4 text-sm">
+                                        <div className="font-bold text-slate-700">RM{totals.projectLevelHardwareCost.toLocaleString()}</div>
+                                        <div className="text-[10px] text-blue-600/50 font-bold">RM{(margin < 1 ? totals.projectLevelHardwareCost / (1 - margin) : totals.projectLevelHardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                    </td>
+                                    <td colSpan={5}></td>
+                                    <td className="py-4 font-black text-slate-900">RM{totals.projectLevelHardwareCost.toLocaleString()}</td>
+                                    <td className="py-4 font-black text-blue-600">RM{(margin < 1 ? totals.projectLevelHardwareCost / (1 - margin) : totals.projectLevelHardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                </tr>
+                            )}
                             {totals.hierarchy.map(sys => {
                                 const sysGross = margin < 1 ? sys.net / (1 - margin) : sys.net;
 
