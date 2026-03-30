@@ -78,6 +78,7 @@ interface ProjectVersion {
         cablingCostPerIO: number;
     } | null;
     markup: number;
+    markupSiteWork: number;
     project?: {
         name: string;
         location?: string | null;
@@ -112,7 +113,10 @@ const calculateVersionTotals = (version: ProjectVersion) => {
             const lodging = Number(sec.lodging);
             const documentation = Number(sec.documentation);
             const training = Number(sec.training);
-            const secSiteCost = mandays + mobilization + lodging + documentation + training;
+            const secSiteWork = mandays + mobilization + lodging;
+            const secDoc = documentation;
+            const secTraining = training;
+            const secTotalSite = secSiteWork + secDoc + secTraining;
 
             sec.ioRequirements.forEach(io => {
                 if (io.ioType === 'DI' || io.ioType === 'DO') secDigital += io.quantity;
@@ -131,19 +135,21 @@ const calculateVersionTotals = (version: ProjectVersion) => {
                 });
             });
 
-            const secHardware = version.components
+            const secDirectHardware = version.components
                 .filter(c => c.sectionId === sec.id)
                 .reduce((acc, c) => acc + (Number(c.snapshottedPrice) * c.quantity), 0);
+            
+            const secHardware = secDirectHardware;
 
             const secEng = (secDigital * rates.engRateDigital) + (secAnalog * rates.engRateAnalog) + (secHli * rates.engRateHLI);
             const secCabling = (secDigital + secAnalog + secHli) * rates.cablingCostPerIO;
-            const secNet = secHardware + secEng + secCabling + secSiteCost;
+            const secNet = secHardware + secEng + secCabling + secTotalSite;
 
             sysDigital += secDigital;
             sysAnalog += secAnalog;
             sysHli += secHli;
             sysSecSum += secNet;
-            sysSecSiteSum += secSiteCost;
+            sysSecSiteSum += secTotalSite;
 
             return {
                 id: sec.id,
@@ -157,7 +163,8 @@ const calculateVersionTotals = (version: ProjectVersion) => {
                     mobilization,
                     lodging,
                     documentation,
-                    training
+                    training,
+                    siteWork: secSiteWork
                 }
             };
         });
@@ -171,8 +178,9 @@ const calculateVersionTotals = (version: ProjectVersion) => {
         const lodging = Number(sys.lodging);
         const documentation = Number(sys.documentation);
         const training = Number(sys.training);
-        const sysDirectSite = mandays + mobilization + lodging + documentation + training;
-        const directNet = sysDirectHardware + sysDirectSite;
+        const sysDirectSiteWork = mandays + mobilization + lodging;
+        const sysDirectSiteTotal = sysDirectSiteWork + documentation + training;
+        const directNet = sysDirectHardware + sysDirectSiteTotal;
 
         // Final System Total is sum of sections + its own direct costs
         const sysNet = sysSecSum + directNet;
@@ -180,7 +188,7 @@ const calculateVersionTotals = (version: ProjectVersion) => {
         digital += sysDigital;
         analog += sysAnalog;
         hli += sysHli;
-        siteSubtotal += (sysDirectSite + sysSecSiteSum);
+        siteSubtotal += (sysDirectSiteTotal + sysSecSiteSum);
 
         // System level breakdown (Aggregated from sections + direct)
         const sysBreakdown = {
@@ -192,6 +200,7 @@ const calculateVersionTotals = (version: ProjectVersion) => {
             lodging: lodging + sections.reduce((acc, s) => acc + s.breakdown.lodging, 0),
             documentation: documentation + sections.reduce((acc, s) => acc + s.breakdown.documentation, 0),
             training: training + sections.reduce((acc, s) => acc + s.breakdown.training, 0),
+            siteWork: sysDirectSiteWork + sections.reduce((acc, s) => acc + s.breakdown.siteWork, 0),
         };
 
         return {
@@ -206,7 +215,8 @@ const calculateVersionTotals = (version: ProjectVersion) => {
                 mobilization,
                 lodging,
                 documentation,
-                training
+                training,
+                siteWork: sysDirectSiteWork
             },
             sections
         };
@@ -214,6 +224,11 @@ const calculateVersionTotals = (version: ProjectVersion) => {
 
     const engCost = (digital * rates.engRateDigital) + (analog * rates.engRateAnalog) + (hli * rates.engRateHLI);
     const cablingCost = (digital + analog + hli) * rates.cablingCostPerIO;
+    
+    const siteWorkCost = hierarchy.reduce((acc, sys) => acc + sys.breakdown.siteWork, 0);
+    const documentationCost = hierarchy.reduce((acc, sys) => acc + sys.breakdown.documentation, 0);
+    const trainingCost = hierarchy.reduce((acc, sys) => acc + sys.breakdown.training, 0);
+    
     const projectLevelHardwareCost = version.components
         .filter(c => !c.systemId && !c.sectionId)
         .reduce((acc, c) => acc + (Number(c.snapshottedPrice) * c.quantity), 0);
@@ -222,6 +237,7 @@ const calculateVersionTotals = (version: ProjectVersion) => {
     return {
         digital, analog, hli, totalIO: digital + analog + hli,
         engCost, cablingCost, siteSubtotal, hardwareCost, projectLevelHardwareCost,
+        siteWorkCost, documentationCost, trainingCost,
         totalNet: engCost + cablingCost + siteSubtotal + hardwareCost,
         hierarchy
     };
@@ -388,9 +404,19 @@ const ProjectEditor: React.FC = () => {
         const eqSheet = XLSX.utils.aoa_to_sheet([eqCols, ...eqData]);
 
         // 3. Project Summary Sheet
-        const markupPercent = Number(version.markup || 0);
-        const margin = markupPercent / 100;
-        const getGross = (net: number) => Math.round(margin < 1 ? net / (1 - margin) : net);
+        const marginGlobal = (Number(version.markup || 25)) / 100;
+        const marginSite = (Number(version.markupSiteWork || 25)) / 100;
+        const getGross = (net: number, isSite: boolean = false) => {
+            const m = isSite ? marginSite : marginGlobal;
+            return Math.round(m < 1 ? net / (1 - m) : net);
+        };
+
+        const totalSellingPrice = getGross(totals.hardwareCost) + 
+                                getGross(totals.engCost) + 
+                                getGross(totals.cablingCost) + 
+                                getGross(totals.siteWorkCost, true) + 
+                                getGross(totals.documentationCost) + 
+                                getGross(totals.trainingCost);
 
         const summaryData: any[] = [
             ["Project Costing Summary", ""],
@@ -399,48 +425,50 @@ const ProjectEditor: React.FC = () => {
             ["Hardware Total", { v: getGross(totals.hardwareCost), t: 'n', z: '"RM"#,##0' }],
             ["Engineering Total", { v: getGross(totals.engCost), t: 'n', z: '"RM"#,##0' }],
             ["Cabling & Installation Total", { v: getGross(totals.cablingCost), t: 'n', z: '"RM"#,##0' }],
-            ["Site Implementation Total", { v: getGross(totals.siteSubtotal), t: 'n', z: '"RM"#,##0' }],
+            ["Site Work (Mandays/Mob/Lodging)", { v: getGross(totals.siteWorkCost, true), t: 'n', z: '"RM"#,##0' }],
+            ["Project Training", { v: getGross(totals.trainingCost), t: 'n', z: '"RM"#,##0' }],
             ["", ""],
-            ["PROJECT SELLING PRICE", { v: getGross(totals.totalNet), t: 'n', z: '"RM"#,##0' }],
+            ["PROJECT SELLING PRICE", { v: Math.round(totalSellingPrice), t: 'n', z: '"RM"#,##0' }],
             ["", ""],
             ["", ""],
             ["Section-wise Price Breakdown", ""],
-            ["Section Name", "Hardware", "Engineering", "Cabling", "Site Implementation", "Section Total"]
+            ["Section Name", "Hardware", "Engineering", "Cabling", "Site Work", "Doc", "Training", "Section Total"]
         ];
 
         totals.hierarchy.forEach(sys => {
             // Add Project Level Hardware if this is the first iteration and cost exists
-            if (totals.projectLevelHardwareCost > 0 && summaryData.length === 15) {
+            if (totals.projectLevelHardwareCost > 0 && summaryData.length === 17) {
                 summaryData.push([
                     "Project Level Hardware",
                     getGross(totals.projectLevelHardwareCost),
-                    0, 0, 0,
+                    0, 0, 0, 0, 0,
                     getGross(totals.projectLevelHardwareCost)
                 ]);
             }
 
             sys.sections.forEach(sec => {
-                const secSite = sec.breakdown.mandays + sec.breakdown.mobilization + sec.breakdown.lodging + sec.breakdown.documentation + sec.breakdown.training;
                 summaryData.push([
                     sec.name,
                     getGross(sec.breakdown.hardware),
                     getGross(sec.breakdown.eng),
                     getGross(sec.breakdown.cabling),
-                    getGross(secSite),
-                    getGross(sec.net)
+                    getGross(sec.breakdown.siteWork, true),
+                    getGross(sec.breakdown.documentation),
+                    getGross(sec.breakdown.training),
+                    getGross(sec.breakdown.hardware) + getGross(sec.breakdown.eng) + getGross(sec.breakdown.cabling) + getGross(sec.breakdown.siteWork, true) + getGross(sec.breakdown.documentation) + getGross(sec.breakdown.training)
                 ]);
             });
 
             // Add System Direct Costs if any
             if (sys.directNet > 0) {
-                const sysDirectSite = sys.directBreakdown.mandays + sys.directBreakdown.mobilization + sys.directBreakdown.lodging + sys.directBreakdown.documentation + sys.directBreakdown.training;
                 summaryData.push([
                     `(Direct) ${sys.name}`,
                     getGross(sys.directBreakdown.hardware),
-                    0, // No direct eng/cabling usually at system level in this model
-                    0,
-                    getGross(sysDirectSite),
-                    getGross(sys.directNet)
+                    0, 0,
+                    getGross(sys.directBreakdown.siteWork, true),
+                    getGross(sys.directBreakdown.documentation),
+                    getGross(sys.directBreakdown.training),
+                    getGross(sys.directBreakdown.hardware) + getGross(sys.directBreakdown.siteWork, true) + getGross(sys.directBreakdown.documentation) + getGross(sys.directBreakdown.training)
                 ]);
             }
         });
@@ -1643,22 +1671,40 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     const totals = calculateVersionTotals(version);
     const [markupPercent, setMarkupPercent] = useState(() => {
         const val = version.markup ? Number(version.markup) : 25;
-        // Auto-fix if it was stored as a legacy multiplier (e.g. 1.25)
+        return val < 5 ? (val - 1) * 100 : val;
+    });
+    const [markupSiteWork, setMarkupSiteWork] = useState(() => {
+        const val = version.markupSiteWork ? Number(version.markupSiteWork) : 25;
         return val < 5 ? (val - 1) * 100 : val;
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    const margin = markupPercent / 100;
-    const totalProjectPrice = margin < 1 ? totals.totalNet / (1 - margin) : totals.totalNet;
+    const marginGlobal = markupPercent / 100;
+    const marginSite = markupSiteWork / 100;
+
+    const getGross = (net: number, isSiteWork: boolean = false) => {
+        const m = isSiteWork ? marginSite : marginGlobal;
+        return m < 1 ? net / (1 - m) : net;
+    };
+
+    const totalProjectPrice = getGross(totals.hardwareCost) + 
+                             getGross(totals.engCost) + 
+                             getGross(totals.cablingCost) + 
+                             getGross(totals.siteWorkCost, true) + 
+                             getGross(totals.documentationCost) + 
+                             getGross(totals.trainingCost);
 
     const handleSaveMarkup = async () => {
         setIsSaving(true);
         try {
-            await api.put(`/versions/${version.id}`, { markup: markupPercent });
+            await api.put(`/versions/${version.id}`, { 
+                markup: markupPercent,
+                markupSiteWork: markupSiteWork 
+            });
             onUpdate();
-            alert("Markup saved successfully");
+            alert("Markups saved successfully");
         } catch (error) {
-            alert("Error saving markup");
+            alert("Error saving markups");
         } finally {
             setIsSaving(false);
         }
@@ -1668,14 +1714,27 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
         <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500 pb-20">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <SummaryCard label="Points of IO" value={totals.totalIO} unit="Pt" />
-                <SummaryCard label="Hardware Net" value={`RM${totals.hardwareCost.toLocaleString()}`} color="text-blue-600" />
-                <SummaryCard label="Services & Site" value={`RM${(totals.engCost + totals.siteSubtotal + totals.cablingCost).toLocaleString()}`} color="text-indigo-600" />
-                <div className="p-10 rounded-[3rem] shadow-2xl bg-slate-900 text-white relative overflow-hidden group border border-slate-800">
+                <SummaryCard 
+                    label="Hardware Selling Price" 
+                    value={`RM${getGross(totals.hardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} 
+                    subValue={`Net: RM${totals.hardwareCost.toLocaleString()}`}
+                    color="text-blue-600" 
+                />
+                <SummaryCard 
+                    label="Services & Site Selling Price" 
+                    value={`RM${(getGross(totals.engCost) + getGross(totals.siteWorkCost, true) + getGross(totals.cablingCost) + getGross(totals.documentationCost) + getGross(totals.trainingCost)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} 
+                    subValue={`Net: RM${(totals.engCost + totals.siteWorkCost + totals.cablingCost + totals.documentationCost + totals.trainingCost).toLocaleString()}`}
+                    color="text-indigo-600" 
+                />
+                <div className="p-10 rounded-[3rem] shadow-2xl bg-slate-900 text-white relative overflow-hidden group border border-slate-800 flex flex-col justify-between">
                     <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-700">
                         <Save size={100} />
                     </div>
-                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] mb-3">Project Net Total</div>
-                    <div className="text-4xl font-black text-white leading-none tracking-tighter">RM{totals.totalNet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    <div>
+                        <div className="text-[10px] text-blue-400 font-black uppercase tracking-[0.3em] mb-3 group-hover:text-blue-300 transition-colors">Total Project Selling Price</div>
+                        <div className="text-5xl font-black text-white leading-none tracking-tighter">RM{totalProjectPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                        <div className="text-[10px] text-slate-500 font-bold mt-1 italic">Net Cost: RM{totals.totalNet.toLocaleString()}</div>
+                    </div>
                 </div>
             </div>
 
@@ -1683,56 +1742,75 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                 <div className="lg:col-span-3 bg-white border border-slate-100 rounded-[3rem] p-12 shadow-sm">
                     <h3 className="text-2xl font-black text-slate-900 mb-10 flex items-center gap-4">
                         <div className="w-2 h-10 bg-blue-600 rounded-full"></div>
-                        Cost Distribution
+                        Cost Distribution (Selling Price)
                     </h3>
-                    <div className="space-y-10">
+                    <div className="space-y-8">
                         <CostItem label="Systems Architecture (Hardware)" amount={totals.hardwareCost} total={totals.totalNet} color="bg-blue-600" markupPercent={markupPercent} />
                         <CostItem label="Engineering Services" amount={totals.engCost} total={totals.totalNet} color="bg-indigo-600" markupPercent={markupPercent} />
                         <CostItem label="Cabling & Installation" amount={totals.cablingCost} total={totals.totalNet} color="bg-emerald-500" markupPercent={markupPercent} />
-                        <CostItem label="Site Implementation" amount={totals.siteSubtotal} total={totals.totalNet} color="bg-teal-500" markupPercent={markupPercent} />
+                        <CostItem label="Site Work (Mandays/Mob/Lodging)" amount={totals.siteWorkCost} total={totals.totalNet} color="bg-teal-500" markupPercent={markupSiteWork} />
+                        <CostItem label="Project Documentation" amount={totals.documentationCost} total={totals.totalNet} color="bg-amber-500" markupPercent={markupPercent} />
+                        <CostItem label="Project Training" amount={totals.trainingCost} total={totals.totalNet} color="bg-orange-500" markupPercent={markupPercent} />
                     </div>
                 </div>
 
                 <div className="lg:col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-[3rem] p-12 text-white shadow-2xl flex flex-col relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none bg-[radial-gradient(circle_at_top_right,white,transparent)] transition-transform group-hover:scale-110 duration-1000"></div>
 
-                    <div className="flex justify-between items-center mb-12 relative z-10">
+                    <div className="flex flex-col gap-8 relative z-10 flex-1">
                         <h3 className="text-xl font-black uppercase tracking-widest text-slate-300">Markup Settings</h3>
-                        <div className="flex items-center gap-3 bg-white/10 p-2 rounded-2xl border border-white/5">
-                            <input
-                                type="number"
-                                value={markupPercent}
-                                onChange={(e) => setMarkupPercent(Number(e.target.value) || 0)}
-                                className="bg-transparent border-none text-right font-black text-xl w-16 focus:ring-0 p-0"
-                            />
-                            <span className="text-xs font-bold text-slate-400">%</span>
+                        
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+                                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Global Markup</span>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={markupPercent}
+                                        onChange={(e) => setMarkupPercent(Number(e.target.value) || 0)}
+                                        className="bg-transparent border-none text-right font-black text-xl w-16 focus:ring-0 p-0 text-white"
+                                    />
+                                    <span className="text-xs font-bold text-slate-500">%</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+                                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Site Work Markup</span>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={markupSiteWork}
+                                        onChange={(e) => setMarkupSiteWork(Number(e.target.value) || 0)}
+                                        className="bg-transparent border-none text-right font-black text-xl w-16 focus:ring-0 p-0 text-white"
+                                    />
+                                    <span className="text-xs font-bold text-slate-500">%</span>
+                                </div>
+                            </div>
+
                             <button
                                 onClick={handleSaveMarkup}
                                 disabled={isSaving}
-                                className="bg-blue-600 hover:bg-blue-500 p-2 rounded-xl transition-colors disabled:opacity-50"
+                                className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl transition-all disabled:opacity-50 font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 shadow-xl hover:shadow-blue-500/20 active:scale-[0.98]"
                             >
                                 <Save size={16} />
+                                {isSaving ? 'Saving...' : 'Save All Margins'}
                             </button>
                         </div>
-                    </div>
 
-                    <div className="space-y-8 relative z-10 flex-1">
-                        <div className="flex justify-between items-center opacity-70 uppercase text-[10px] font-black tracking-[0.2em]">
-                            <span>Project Net Cost</span>
-                            <span className="text-lg font-black text-white">RM{totals.totalNet.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center opacity-70 uppercase text-[10px] font-black tracking-[0.2em] pt-6 border-t border-white/10">
-                            <span>Calculated Margin</span>
-                            <span className="text-lg font-black text-white">{markupPercent}%</span>
-                        </div>
-
-                        <div className="pt-12 mt-8 border-t border-white/20">
-                            <div className="text-blue-400 uppercase text-[10px] font-black tracking-[0.4em] mb-4">Gross Selling Price</div>
-                            <div className="text-6xl font-black tracking-tighter text-white drop-shadow-2xl">
-                                RM{totalProjectPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        <div className="mt-auto space-y-4 pt-8 border-t border-white/10">
+                            <div className="flex justify-between items-center opacity-70 uppercase text-[9px] font-black tracking-widest">
+                                <span>Project Net Cost</span>
+                                <span className="text-md font-black text-white">RM{totals.totalNet.toLocaleString()}</span>
                             </div>
-                            <div className="mt-2 text-[10px] text-slate-500 font-bold italic">
-                                Formula: Net / (1 - {markupPercent}%)
+                            <div className="flex justify-between items-center opacity-70 uppercase text-[9px] font-black tracking-widest">
+                                <span>Total Margin RM</span>
+                                <span className="text-md font-black text-white">RM{(totalProjectPrice - totals.totalNet).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="pt-6">
+                                <div className="text-blue-400 uppercase text-[9px] font-black tracking-[0.3em] mb-2">Final Selling Price</div>
+                                <div className="text-5xl font-black tracking-tighter text-white">
+                                    RM{totalProjectPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1752,9 +1830,9 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                 <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Hardware</th>
                                 <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Eng</th>
                                 <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Cabling</th>
-                                <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Mandays</th>
-                                <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Mob</th>
-                                <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Other Site</th>
+                                <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Site Work</th>
+                                <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Doc</th>
+                                <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Training</th>
                                 <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Net Total</th>
                                 <th className="pb-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Gross Total</th>
                             </tr>
@@ -1767,16 +1845,21 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                         <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest text-xs">Global Items</div>
                                     </td>
                                     <td className="py-4 text-sm">
-                                        <div className="font-bold text-slate-700">RM{totals.projectLevelHardwareCost.toLocaleString()}</div>
-                                        <div className="text-[10px] text-blue-600/50 font-bold">RM{(margin < 1 ? totals.projectLevelHardwareCost / (1 - margin) : totals.projectLevelHardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                        <div className="font-black text-slate-900">RM{getGross(totals.projectLevelHardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                        <div className="text-[10px] text-slate-400 font-bold">RM{totals.projectLevelHardwareCost.toLocaleString()}</div>
                                     </td>
                                     <td colSpan={5}></td>
                                     <td className="py-4 font-black text-slate-900">RM{totals.projectLevelHardwareCost.toLocaleString()}</td>
-                                    <td className="py-4 font-black text-blue-600">RM{(margin < 1 ? totals.projectLevelHardwareCost / (1 - margin) : totals.projectLevelHardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td className="py-4 font-black text-blue-600">RM{getGross(totals.projectLevelHardwareCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                                 </tr>
                             )}
                             {totals.hierarchy.map(sys => {
-                                const sysGross = margin < 1 ? sys.net / (1 - margin) : sys.net;
+                                const sysGross = getGross(sys.breakdown.hardware) + 
+                                               getGross(sys.breakdown.eng) + 
+                                               getGross(sys.breakdown.cabling) + 
+                                               getGross(sys.breakdown.siteWork, true) + 
+                                               getGross(sys.breakdown.documentation) + 
+                                               getGross(sys.breakdown.training);
 
                                 return (
                                     <React.Fragment key={sys.id}>
@@ -1786,18 +1869,19 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                 <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest text-xs">System Level</div>
                                             </td>
                                             {[
-                                                sys.breakdown.hardware,
-                                                sys.breakdown.eng,
-                                                sys.breakdown.cabling,
-                                                sys.breakdown.mandays,
-                                                sys.breakdown.mobilization,
-                                                sys.breakdown.lodging + sys.breakdown.documentation + sys.breakdown.training
-                                            ].map((val, i) => {
-                                                const grossVal = margin < 1 ? val / (1 - margin) : val;
+                                                { val: sys.breakdown.hardware, isSite: false },
+                                                { val: sys.breakdown.eng, isSite: false },
+                                                { val: sys.breakdown.cabling, isSite: false },
+                                                { val: sys.breakdown.siteWork, isSite: true },
+                                                { val: sys.breakdown.documentation, isSite: false },
+                                                { val: sys.breakdown.training, isSite: false }
+                                            ].map((item, i) => {
+                                                const val = item.val;
+                                                const grossVal = getGross(val, item.isSite);
                                                 return (
                                                     <td key={i} className="py-6 text-sm">
-                                                        <div className="font-bold text-slate-700">RM{val.toLocaleString()}</div>
-                                                        <div className="text-[10px] text-blue-600/50 font-bold">RM{grossVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                                        <div className="font-black text-slate-900">RM{grossVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold">RM{val.toLocaleString()}</div>
                                                     </td>
                                                 );
                                             })}
@@ -1810,27 +1894,33 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                     <div className="font-bold text-amber-700">(Direct System Costs)</div>
                                                 </td>
                                                 {[
-                                                    sys.directBreakdown.hardware,
-                                                    0, // Eng
-                                                    0, // Cabling
-                                                    sys.directBreakdown.mandays,
-                                                    sys.directBreakdown.mobilization,
-                                                    sys.directBreakdown.lodging + sys.directBreakdown.documentation + sys.directBreakdown.training
-                                                ].map((val, i) => {
-                                                    const grossVal = margin < 1 ? val / (1 - margin) : val;
+                                                    { val: sys.directBreakdown.hardware, isSite: false },
+                                                    { val: 0, isSite: false },
+                                                    { val: 0, isSite: false },
+                                                    { val: sys.directBreakdown.siteWork, isSite: true },
+                                                    { val: sys.directBreakdown.documentation, isSite: false },
+                                                    { val: sys.directBreakdown.training, isSite: false }
+                                                ].map((item, i) => {
+                                                    const val = item.val;
+                                                    const grossVal = getGross(val, item.isSite);
                                                     return (
                                                         <td key={i} className="py-3">
-                                                            <div className="text-amber-600 font-medium">RM{val.toLocaleString()}</div>
-                                                            <div className="text-[9px] text-amber-900/40 font-bold">RM{grossVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                                            <div className="text-amber-900 font-black">RM{grossVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                                            <div className="text-[9px] text-amber-600/50 font-bold">RM{val.toLocaleString()}</div>
                                                         </td>
                                                     );
                                                 })}
                                                 <td className="py-3 font-bold text-amber-700">RM{sys.directNet.toLocaleString()}</td>
-                                                <td className="py-3 font-black text-amber-900">RM{(margin < 1 ? sys.directNet / (1 - margin) : sys.directNet).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                                <td className="py-3 font-black text-amber-900">RM{(getGross(sys.directBreakdown.hardware) + getGross(sys.directBreakdown.siteWork, true) + getGross(sys.directBreakdown.documentation) + getGross(sys.directBreakdown.training)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                                             </tr>
                                         )}
                                         {sys.sections.map(sec => {
-                                            const secGross = margin < 1 ? sec.net / (1 - margin) : sec.net;
+                                            const secGross = getGross(sec.breakdown.hardware) + 
+                                                           getGross(sec.breakdown.eng) + 
+                                                           getGross(sec.breakdown.cabling) + 
+                                                           getGross(sec.breakdown.siteWork, true) + 
+                                                           getGross(sec.breakdown.documentation) + 
+                                                           getGross(sec.breakdown.training);
                                             return (
                                                 <tr key={sec.id} className="group hover:bg-slate-50/50 transition-colors text-[12px]">
                                                     <td className="py-4 pl-8 pr-4 border-l-2 border-slate-100">
@@ -1838,18 +1928,19 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                                         <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Section</div>
                                                     </td>
                                                     {[
-                                                        sec.breakdown.hardware,
-                                                        sec.breakdown.eng,
-                                                        sec.breakdown.cabling,
-                                                        sec.breakdown.mandays,
-                                                        sec.breakdown.mobilization,
-                                                        sec.breakdown.lodging + sec.breakdown.documentation + sec.breakdown.training
-                                                    ].map((val, i) => {
-                                                        const grossVal = margin < 1 ? val / (1 - margin) : val;
+                                                        { val: sec.breakdown.hardware, isSite: false },
+                                                        { val: sec.breakdown.eng, isSite: false },
+                                                        { val: sec.breakdown.cabling, isSite: false },
+                                                        { val: sec.breakdown.siteWork, isSite: true },
+                                                        { val: sec.breakdown.documentation, isSite: false },
+                                                        { val: sec.breakdown.training, isSite: false }
+                                                    ].map((item, i) => {
+                                                        const val = item.val;
+                                                        const grossVal = getGross(val, item.isSite);
                                                         return (
                                                             <td key={i} className="py-4">
-                                                                <div className="text-slate-600 font-medium">RM{val.toLocaleString()}</div>
-                                                                <div className="text-[10px] text-slate-400 font-bold">RM{grossVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                                                <div className="font-black text-slate-900">RM{grossVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                                                <div className="text-[10px] text-slate-400 font-bold">RM{val.toLocaleString()}</div>
                                                             </td>
                                                         );
                                                     })}
@@ -1869,13 +1960,14 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     );
 };
 
-const SummaryCard = ({ label, value, unit, color = "text-slate-900" }: { label: string; value: any; unit?: string; color?: string }) => (
+const SummaryCard = ({ label, value, subValue, unit, color = "text-slate-900" }: { label: string; value: any; subValue?: string; unit?: string; color?: string }) => (
     <div className="bg-white p-10 border border-slate-100 rounded-[3rem] shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 group">
         <div className="text-[9px] text-slate-400 font-black uppercase tracking-[0.3em] mb-3 group-hover:text-blue-600 transition-colors">{label}</div>
         <div className={cn("text-4xl font-black leading-none tracking-tighter", color)}>
             {value}
             {unit && <span className="text-xs font-bold opacity-30 ml-2 uppercase tracking-widest">{unit}</span>}
         </div>
+        {subValue && <div className="text-[10px] text-slate-400 font-bold mt-2">{subValue}</div>}
     </div>
 );
 

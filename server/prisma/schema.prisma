@@ -32,6 +32,7 @@ model ProjectVersion {
   status        String             @default("DRAFT")
   totalCost     Decimal            @default(0)
   markup        Decimal            @default(1.0)
+  markupSiteWork Decimal           @default(1.0)
   createdAt     DateTime           @default(now())
   projectId     String
   costSettings  CostSettings?

@@ -64,6 +64,7 @@ export const createNewVersion = async (req: Request, res: Response) => {
                 versionNumber: (maxVersion?.versionNumber || 0) + 1,
                 status: 'Draft',
                 markup: source.markup,
+                markupSiteWork: source.markupSiteWork,
                 costSettings: source.costSettings ? {
                     create: {
                         engRateDigital: source.costSettings.engRateDigital,
@@ -256,12 +257,13 @@ export const addComponentToVersion = async (req: Request, res: Response) => {
 // Update Version Metadata (e.g., markup)
 export const updateVersion = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { markup, status } = req.body;
+    const { markup, markupSiteWork, status } = req.body;
     try {
         const version = await prisma.projectVersion.update({
             where: { id: id as string },
             data: {
                 markup: markup !== undefined ? Number(markup) : undefined,
+                markupSiteWork: markupSiteWork !== undefined ? Number(markupSiteWork) : undefined,
                 status
             }
         });
