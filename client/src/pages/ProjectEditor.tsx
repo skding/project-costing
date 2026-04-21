@@ -1670,14 +1670,30 @@ const SiteWorkInputs: React.FC<{
 const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> = ({ version, onUpdate }) => {
     const totals = calculateVersionTotals(version);
     const [markupPercent, setMarkupPercent] = useState(() => {
-        const val = version.markup ? Number(version.markup) : 25;
-        return val < 5 ? (val - 1) * 100 : val;
+        const val = Number(version.markup);
+        // DB stores either a multiplier (e.g. 1.25) or a percentage (e.g. 25).
+        // If val <= 1, treat as multiplier and convert to %; if val > 1, it's already a %.
+        // Default to 25% if not set (val === 0 or NaN).
+        if (!val || val === 1) return 25;
+        return val <= 1 ? Math.round((val - 1) * 100) : val;
     });
     const [markupSiteWork, setMarkupSiteWork] = useState(() => {
-        const val = version.markupSiteWork ? Number(version.markupSiteWork) : 25;
-        return val < 5 ? (val - 1) * 100 : val;
+        const val = Number(version.markupSiteWork);
+        if (!val || val === 1) return 25;
+        return val <= 1 ? Math.round((val - 1) * 100) : val;
     });
     const [isSaving, setIsSaving] = useState(false);
+
+    // Sync local markup state whenever the version prop is refreshed from server
+    useEffect(() => {
+        const parseMarkup = (val: any) => {
+            const n = Number(val);
+            if (!n || n === 1) return 25;
+            return n <= 1 ? Math.round((n - 1) * 100) : n;
+        };
+        setMarkupPercent(parseMarkup(version.markup));
+        setMarkupSiteWork(parseMarkup(version.markupSiteWork));
+    }, [version.markup, version.markupSiteWork]);
 
     const marginGlobal = markupPercent / 100;
     const marginSite = markupSiteWork / 100;
