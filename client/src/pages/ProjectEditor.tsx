@@ -1684,17 +1684,6 @@ const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Sync local markup state whenever the version prop is refreshed from server
-    useEffect(() => {
-        const parseMarkup = (val: any) => {
-            const n = Number(val);
-            if (!n || n === 1) return 25;
-            return n <= 1 ? Math.round((n - 1) * 100) : n;
-        };
-        setMarkupPercent(parseMarkup(version.markup));
-        setMarkupSiteWork(parseMarkup(version.markupSiteWork));
-    }, [version.markup, version.markupSiteWork]);
-
     const marginGlobal = markupPercent / 100;
     const marginSite = markupSiteWork / 100;
 
