@@ -251,6 +251,8 @@ const ProjectEditor: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
     const [activeTab, setActiveTab] = useState<'definition' | 'hardware' | 'summary' | 'site'>('definition');
+    const [markupPercent, setMarkupPercent] = useState(25);
+    const [markupSiteWork, setMarkupSiteWork] = useState(25);
 
     useEffect(() => {
         setLoading(true);
@@ -260,10 +262,19 @@ const ProjectEditor: React.FC = () => {
         fetchProjectVersions();
     }, [versionId]);
 
+    const parseMarkup = (val: any): number => {
+        const n = Number(val);
+        if (!n || n === 1) return 25;      // DB default 1.0 → show 25%
+        return n > 1 ? n : 25;             // stored as %, use directly
+    };
+
     const fetchVersionDetails = async () => {
         try {
             const res = await api.get(`/versions/${versionId}`);
             setVersion(res.data);
+            // Sync markup state from fresh server data
+            setMarkupPercent(parseMarkup(res.data.markup));
+            setMarkupSiteWork(parseMarkup(res.data.markupSiteWork));
             // Default expand systems for the new version
             if (res.data.systems.length > 0) {
                 setExpandedSystems(new Set(res.data.systems.map((s: any) => s.id)));
@@ -620,7 +631,7 @@ const ProjectEditor: React.FC = () => {
 
                 {activeTab === 'hardware' && <AdvancedBOM version={version} onUpdate={fetchVersionDetails} />}
                 {activeTab === 'site' && <SiteSettings version={version} onUpdate={fetchVersionDetails} />}
-                {activeTab === 'summary' && <CostSummary version={version} onUpdate={fetchVersionDetails} />}
+                {activeTab === 'summary' && <CostSummary version={version} onUpdate={fetchVersionDetails} markupPercent={markupPercent} setMarkupPercent={setMarkupPercent} markupSiteWork={markupSiteWork} setMarkupSiteWork={setMarkupSiteWork} />}
 
             </div>
         </div>
@@ -1667,21 +1678,15 @@ const SiteWorkInputs: React.FC<{
     );
 };
 
-const CostSummary: React.FC<{ version: ProjectVersion; onUpdate: () => void }> = ({ version, onUpdate }) => {
+const CostSummary: React.FC<{
+    version: ProjectVersion;
+    onUpdate: () => void;
+    markupPercent: number;
+    setMarkupPercent: (v: number) => void;
+    markupSiteWork: number;
+    setMarkupSiteWork: (v: number) => void;
+}> = ({ version, onUpdate, markupPercent, setMarkupPercent, markupSiteWork, setMarkupSiteWork }) => {
     const totals = calculateVersionTotals(version);
-    const [markupPercent, setMarkupPercent] = useState(() => {
-        const val = Number(version.markup);
-        // DB stores either a multiplier (e.g. 1.25) or a percentage (e.g. 25).
-        // If val <= 1, treat as multiplier and convert to %; if val > 1, it's already a %.
-        // Default to 25% if not set (val === 0 or NaN).
-        if (!val || val === 1) return 25;
-        return val <= 1 ? Math.round((val - 1) * 100) : val;
-    });
-    const [markupSiteWork, setMarkupSiteWork] = useState(() => {
-        const val = Number(version.markupSiteWork);
-        if (!val || val === 1) return 25;
-        return val <= 1 ? Math.round((val - 1) * 100) : val;
-    });
     const [isSaving, setIsSaving] = useState(false);
 
     const marginGlobal = markupPercent / 100;
