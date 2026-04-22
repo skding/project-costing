@@ -258,6 +258,7 @@ export const addComponentToVersion = async (req: Request, res: Response) => {
 export const updateVersion = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { markup, markupSiteWork, status } = req.body;
+    console.log(`[updateVersion] Updating version ${id}:`, { markup, markupSiteWork, status });
     try {
         const version = await prisma.projectVersion.update({
             where: { id: id as string },
@@ -267,8 +268,10 @@ export const updateVersion = async (req: Request, res: Response) => {
                 status
             }
         });
+        console.log(`[updateVersion] Successfully updated version ${id}. New values:`, { markup: version.markup, markupSiteWork: version.markupSiteWork });
         res.json(version);
     } catch (error) {
+        console.error(`[updateVersion] Error updating version ${id}:`, error);
         res.status(500).json({ error: 'Failed to update version metadata' });
     }
 };

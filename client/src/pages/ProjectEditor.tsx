@@ -264,13 +264,22 @@ const ProjectEditor: React.FC = () => {
 
     const parseMarkup = (val: any): number => {
         const n = Number(val);
-        if (!n || n === 1) return 25;      // DB default 1.0 → show 25%
-        return n > 1 ? n : 25;             // stored as %, use directly
+        // If it's explicitly null or undefined, return default 25
+        if (val === null || val === undefined) return 25;
+        // If it's exactly 1.0 (the Prisma default), return 25
+        if (n === 1) return 25;
+        // Otherwise return the number as is (allowing 0, 0.5, 30, etc.)
+        return isNaN(n) ? 25 : n;
     };
 
     const fetchVersionDetails = async () => {
         try {
             const res = await api.get(`/versions/${versionId}`);
+            console.log('[ProjectEditor] Fetched Version Data:', {
+                id: res.data.id,
+                markup: res.data.markup,
+                markupSiteWork: res.data.markupSiteWork
+            });
             setVersion(res.data);
             // Sync markup state from fresh server data
             setMarkupPercent(parseMarkup(res.data.markup));
