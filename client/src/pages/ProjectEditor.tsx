@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { 
-    Plus, Search, Edit2, Trash2, ChevronRight, ChevronDown, CheckCircle2, 
-    AlertCircle, Save, FileText, Download, MoreVertical, X, Settings, Package 
+    Plus, Edit2, Trash2, ChevronDown, Save, Download, X, Package, Layers, Check 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
