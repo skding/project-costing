@@ -3,7 +3,7 @@ import prisma from '../prisma';
 
 export const getAllPackages = async (req: Request, res: Response) => {
     try {
-        const packages = await prisma.hardwarePackage.findMany({
+        const packages = await (prisma as any).hardwarePackage.findMany({
             include: {
                 items: {
                     include: {
@@ -21,7 +21,7 @@ export const getAllPackages = async (req: Request, res: Response) => {
 export const createPackage = async (req: Request, res: Response) => {
     const { name, description, items } = req.body;
     try {
-        const pkg = await prisma.hardwarePackage.create({
+        const pkg = await (prisma as any).hardwarePackage.create({
             data: {
                 name,
                 description,
@@ -54,13 +54,13 @@ export const updatePackage = async (req: Request, res: Response) => {
         const result = await prisma.$transaction(async (tx: any) => {
             // Update basic info
             await tx.hardwarePackage.update({
-                where: { id },
+                where: { id: id as string },
                 data: { name, description }
             });
 
             // Replace items
             await tx.hardwarePackageItem.deleteMany({
-                where: { packageId: id }
+                where: { packageId: id as string }
             });
 
             if (items && items.length > 0) {
@@ -74,7 +74,7 @@ export const updatePackage = async (req: Request, res: Response) => {
             }
 
             return tx.hardwarePackage.findUnique({
-                where: { id },
+                where: { id: id as string },
                 include: {
                     items: {
                         include: {
@@ -93,8 +93,8 @@ export const updatePackage = async (req: Request, res: Response) => {
 export const deletePackage = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        await prisma.hardwarePackage.delete({
-            where: { id }
+        await (prisma as any).hardwarePackage.delete({
+            where: { id: id as string }
         });
         res.status(204).send();
     } catch (error) {
@@ -107,15 +107,15 @@ export const addPackageToVersion = async (req: Request, res: Response) => {
     const { systemId, sectionId } = req.body;
 
     try {
-        const pkg = await prisma.hardwarePackage.findUnique({
-            where: { id: packageId },
+        const pkg = await (prisma as any).hardwarePackage.findUnique({
+            where: { id: packageId as string },
             include: { items: { include: { catalog: true } } }
         });
 
         if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
         // Expand items into ProjectComponents
-        const componentsData = pkg.items.map(item => ({
+        const componentsData = pkg.items.map((item: any) => ({
             projectVersionId: versionId,
             catalogId: item.catalogId,
             quantity: item.quantity,
