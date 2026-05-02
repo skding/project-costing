@@ -20,10 +20,11 @@ The backend requires a database migration and a rebuild.
     ```bash
     npm install
     ```
-3.  **Run Database Migrations**:
-    This step is CRITICAL to add the new `HardwarePackage` and `HardwarePackageItem` tables to your production database.
+3.  **Run Database Migrations & Generate Client**:
+    This step is CRITICAL to add the new `HardwarePackage` and `HardwarePackageItem` tables to your production database and update the Prisma Client types.
     ```bash
     npx prisma migrate deploy
+    npx prisma generate
     ```
 4.  **Rebuild the Backend**:
     ```bash
