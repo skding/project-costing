@@ -31,7 +31,6 @@ const ComponentLibrary: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'components' | 'packages'>('components');
     const [components, setComponents] = useState<Component[]>([]);
     const [packages, setPackages] = useState<HardwarePackage[]>([]);
-    const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -66,7 +65,6 @@ const ComponentLibrary: React.FC = () => {
     }, []);
 
     const fetchData = async () => {
-        setLoading(true);
         try {
             const [compRes, pkgRes] = await Promise.all([
                 api.get('/components'),
@@ -82,8 +80,6 @@ const ComponentLibrary: React.FC = () => {
             setAvailableCategories(uniqueCats);
         } catch (error) {
             console.error('Error fetching data', error);
-        } finally {
-            setLoading(false);
         }
     };
 
