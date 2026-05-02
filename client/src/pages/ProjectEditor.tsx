@@ -1032,6 +1032,8 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     const [activeTarget, setActiveTarget] = useState<{ type: 'project' | 'system' | 'section'; id?: string } | null>(null);
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
+    const [catalogTab, setCatalogTab] = useState<'components' | 'packages'>('components');
+    const [packages, setPackages] = useState<any[]>([]);
 
     const toggleCollapse = (id: string) => {
         const newCollapsed = new Set(collapsed);
@@ -1042,6 +1044,7 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
 
     useEffect(() => {
         api.get('/components').then((res: any) => setCatalog(res.data));
+        api.get('/packages').then((res: any) => setPackages(res.data));
     }, []);
 
     const categories = Array.from(new Set(catalog.map(c => c.category))).sort();
@@ -1065,6 +1068,22 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
             onUpdate();
         } catch (error) {
             alert("Error adding component");
+        }
+    };
+
+    const addPackage = async (packageId: string) => {
+        if (!activeTarget) {
+            alert("Select a Target (Project, System, or Section) from the list below first!");
+            return;
+        }
+        try {
+            await api.post(`/packages/${packageId}/add-to-version/${version.id}`, {
+                systemId: activeTarget.type === 'system' ? activeTarget.id : null,
+                sectionId: activeTarget.type === 'section' ? activeTarget.id : null
+            });
+            onUpdate();
+        } catch (error) {
+            alert("Error adding package");
         }
     };
 
@@ -1314,44 +1333,98 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
             {/* Right: Catalog */}
             <div className="space-y-6">
                 <div className="sticky top-24">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Module Catalog</h3>
-                        <select
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                            className="bg-slate-100 border-none rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="all">All Categories</option>
-                            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
+                    <div className="flex flex-col gap-4 mb-6">
+                        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                            <button
+                                onClick={() => setCatalogTab('components')}
+                                className={cn("flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                    catalogTab === 'components' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500")}
+                            >
+                                Components
+                            </button>
+                            <button
+                                onClick={() => setCatalogTab('packages')}
+                                className={cn("flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                    catalogTab === 'packages' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500")}
+                            >
+                                Packages
+                            </button>
+                        </div>
+
+                        {catalogTab === 'components' && (
+                            <div className="flex justify-between items-center px-2">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Catalog</h3>
+                                <select
+                                    value={categoryFilter}
+                                    onChange={(e) => setCategoryFilter(e.target.value)}
+                                    className="bg-transparent border-none p-0 text-[10px] font-black uppercase tracking-widest text-blue-600 outline-none cursor-pointer"
+                                >
+                                    <option value="all">All</option>
+                                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        {catalogTab === 'packages' && (
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Hardware Packages</h3>
+                        )}
                     </div>
-                    <div className="bg-white border-2 border-slate-50 rounded-[2.5rem] p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-sm custom-scrollbar">
-                        {filteredCatalog.map(item => (
-                            <div key={item.id}
-                                className="p-5 border-2 border-slate-50 rounded-3xl group hover:border-blue-100 hover:bg-blue-50/20 transition-all cursor-pointer relative"
-                                onClick={() => addComponent(item.id)}>
-                                <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{item.category}</div>
-                                        <div className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{item.model}</div>
-                                        <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{item.brand} • RM{Number(item.listPrice).toLocaleString()}</div>
+
+                    <div className="bg-white border-2 border-slate-50 rounded-[2.5rem] p-6 space-y-4 max-h-[70vh] overflow-y-auto shadow-sm custom-scrollbar">
+                        {catalogTab === 'components' ? (
+                            filteredCatalog.map(item => (
+                                <div key={item.id}
+                                    className="p-5 border-2 border-slate-50 rounded-3xl group hover:border-blue-100 hover:bg-blue-50/20 transition-all cursor-pointer relative"
+                                    onClick={() => addComponent(item.id)}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{item.category}</div>
+                                            <div className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{item.model}</div>
+                                            <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{item.brand} • RM{Number(item.listPrice).toLocaleString()}</div>
+                                        </div>
+                                        <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-300 group-hover:text-blue-600 group-hover:border-blue-100 transition-all">
+                                            <Plus size={16} />
+                                        </div>
                                     </div>
-                                    <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-300 group-hover:text-blue-600 group-hover:border-blue-100 transition-all">
-                                        <Plus size={16} />
+                                    {item.ioSpecs && Object.keys(item.ioSpecs).length > 0 && (
+                                        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
+                                            {Object.entries(item.ioSpecs as Record<string, any>).map(([type, qty]) => (
+                                                <span key={type} className="text-[8px] font-black bg-slate-100 px-2 py-0.5 rounded-md text-slate-500 uppercase tracking-widest border border-slate-200/50">
+                                                    {String(qty)} {type}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            packages.map(pkg => (
+                                <div key={pkg.id}
+                                    className="p-6 border-2 border-slate-50 rounded-[2rem] group hover:border-slate-900 hover:bg-slate-50 transition-all cursor-pointer relative"
+                                    onClick={() => addPackage(pkg.id)}>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="p-3 bg-slate-100 rounded-xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all">
+                                            <Package size={20} />
+                                        </div>
+                                        <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-300 group-hover:text-slate-900 transition-all">
+                                            <Plus size={16} />
+                                        </div>
+                                    </div>
+                                    <div className="text-xs font-black text-slate-900 uppercase tracking-tight mb-1 group-hover:text-slate-900">{pkg.name}</div>
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider line-clamp-2">{pkg.description || 'Standard hardware package.'}</div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1.5">
+                                        {pkg.items.slice(0, 3).map((item: any) => (
+                                            <div key={item.id} className="flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                                                <span>{item.catalog?.model}</span>
+                                                <span className="text-slate-900">x{item.quantity}</span>
+                                            </div>
+                                        ))}
+                                        {pkg.items.length > 3 && <div className="text-[8px] font-black text-blue-600 uppercase">+{pkg.items.length - 3} more items</div>}
                                     </div>
                                 </div>
-                                {item.ioSpecs && Object.keys(item.ioSpecs).length > 0 && (
-                                    <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-                                        {Object.entries(item.ioSpecs as Record<string, any>).map(([type, qty]) => (
-                                            <span key={type} className="text-[8px] font-black bg-slate-100 px-2 py-0.5 rounded-md text-slate-500 uppercase tracking-widest border border-slate-200/50">
-                                                {String(qty)} {type}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                        {catalog.length === 0 && <div className="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">Catalog synchronization required...</div>}
+                            ))
+                        )}
+                        {catalogTab === 'components' && catalog.length === 0 && <div className="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">Catalog synchronization required...</div>}
+                        {catalogTab === 'packages' && packages.length === 0 && <div className="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">No packages defined in library...</div>}
                     </div>
                     {activeTarget && (
                         <div className="mt-6 p-6 bg-blue-600 rounded-[2rem] text-white shadow-xl shadow-blue-200 animate-in zoom-in-95 duration-300">

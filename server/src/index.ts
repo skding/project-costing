@@ -13,6 +13,7 @@ import componentRoutes from './routes/componentRoutes';
 import clientRoutes from './routes/clientRoutes';
 import userRoutes from './routes/userRoutes';
 import equipmentRoutes from './routes/equipmentRoutes';
+import packageRoutes from './routes/packageRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
 
 app.use(cors());
@@ -24,6 +25,7 @@ app.use('/api/versions', authMiddleware, versionRoutes);
 app.use('/api/components', authMiddleware, componentRoutes);
 app.use('/api/clients', authMiddleware, clientRoutes);
 app.use('/api/equipment', authMiddleware, equipmentRoutes);
+app.use('/api/packages', authMiddleware, packageRoutes);
 
 app.get('/', (req, res) => {
     res.send('Project Costing API is running');
