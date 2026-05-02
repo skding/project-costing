@@ -66,20 +66,23 @@ const ComponentLibrary: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const [compRes, pkgRes] = await Promise.all([
-                api.get('/components'),
-                api.get('/packages')
-            ]);
+            const compRes = await api.get('/components');
             setComponents(compRes.data);
-            setPackages(pkgRes.data);
-
+            
             const uniqueCats = Array.from(new Set([
                 ...defaultCategories,
                 ...compRes.data.map((c: Component) => c.category)
             ])).filter(Boolean).sort();
             setAvailableCategories(uniqueCats);
         } catch (error) {
-            console.error('Error fetching data', error);
+            console.error('Error fetching components', error);
+        }
+
+        try {
+            const pkgRes = await api.get('/packages');
+            setPackages(pkgRes.data);
+        } catch (error) {
+            console.error('Error fetching packages', error);
         }
     };
 
