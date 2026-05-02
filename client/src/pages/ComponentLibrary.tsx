@@ -177,8 +177,11 @@ const ComponentLibrary: React.FC = () => {
             setEditingPkgId(null);
             fetchData();
             setNewPkg({ name: '', description: '', items: [] });
-        } catch (error) {
-            alert('Error saving package');
+        } catch (error: any) {
+            console.error('Save Package Error:', error);
+            const msg = error.response?.data?.error || 'Error saving package';
+            const details = error.response?.data?.details ? ` (${error.response.data.details})` : '';
+            alert(`${msg}${details}`);
         }
     };
 

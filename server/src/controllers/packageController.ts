@@ -41,9 +41,13 @@ export const createPackage = async (req: Request, res: Response) => {
             }
         });
         res.json(pkg);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to create package' });
+    } catch (error: any) {
+        console.error('Create Package Error:', error);
+        res.status(500).json({ 
+            error: 'Failed to create package', 
+            details: error.message,
+            code: error.code 
+        });
     }
 };
 
