@@ -40,11 +40,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const currentPage = navItems.find(item => item.path === location.pathname) || { label: 'Dashboard' };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex overflow-hidden">
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
             {/* Mobile Backdrop */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
             )}
@@ -52,7 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Sidebar */}
             <aside
                 className={cn(
-                    "bg-slate-900 text-white flex flex-col transition-all duration-300 ease-in-out z-50 shadow-2xl",
+                    "bg-slate-900/95 border-r border-slate-800 text-white flex flex-col transition-all duration-300 ease-in-out z-50 shadow-2xl backdrop-blur-md",
                     "fixed inset-y-0 left-0 md:static",
                     isMobileMenuOpen ? "translate-x-0 w-72" : "-translate-x-full md:translate-x-0",
                     isCollapsed ? "md:w-20" : "md:w-64"
@@ -176,50 +176,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Top Navbar */}
                 <header
-                    className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30 shrink-0 shadow-sm"
+                    className="h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30 shrink-0 shadow-lg shadow-black/20"
                 >
                     <div className="flex items-center gap-3">
                         {/* Mobile Menu Button */}
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
-                            className="md:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                            className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
                             aria-label="Open menu"
                         >
                             <Menu size={22} />
                         </button>
 
-                        <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
+                        <h2 className="text-base sm:text-lg font-black text-white tracking-tight truncate">
                             {currentPage.label}
                         </h2>
 
-                        <div className="hidden lg:flex items-center bg-slate-100 rounded-xl px-3 py-1.5 gap-2 border border-slate-200/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                        <div className="hidden lg:flex items-center bg-slate-800/80 rounded-xl px-3 py-1.5 gap-2 border border-slate-700/60 focus-within:bg-slate-800 focus-within:ring-2 focus-within:ring-blue-500/50 transition-all">
                             <Search size={16} className="text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Global Search..."
-                                className="bg-transparent border-none text-xs outline-none w-44 font-medium placeholder:text-slate-400"
+                                className="bg-transparent border-none text-xs outline-none w-44 font-medium text-slate-200 placeholder:text-slate-500"
                             />
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors relative">
+                        <button className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors relative">
                             <Bell size={18} />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
                         </button>
-                        <div className="h-6 w-[1px] bg-slate-200 mx-0.5 sm:mx-1" />
+                        <div className="h-6 w-[1px] bg-slate-800 mx-0.5 sm:mx-1" />
                         <div className="flex items-center gap-2 sm:gap-3 pl-1 sm:pl-2 pr-1 py-1 group">
                             <div className="hidden sm:flex flex-col items-end mr-1">
-                                <span className="text-xs font-bold text-slate-900">{user?.name || 'User'}</span>
-                                <span className="text-[10px] text-slate-500 font-medium tracking-wide leading-none uppercase">{user?.email || 'N/A'}</span>
+                                <span className="text-xs font-bold text-white">{user?.name || 'User'}</span>
+                                <span className="text-[10px] text-slate-400 font-medium tracking-wide leading-none uppercase">{user?.email || 'N/A'}</span>
                             </div>
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm ring-1 ring-slate-200/50 group-hover:ring-blue-200 transition-all overflow-hidden bg-[radial-gradient(circle_at_24%_24%,_var(--tw-gradient-from)_0%,_transparent_100%)] from-blue-50">
-                                <User size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 shadow-sm group-hover:border-blue-500 transition-all overflow-hidden">
+                                <User size={18} className="text-slate-400 group-hover:text-blue-400 transition-colors" />
                             </div>
                         </div>
                         <button
                             onClick={logout}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                             title="Sign Out"
                         >
                             <LogOut size={18} />
@@ -228,7 +228,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </header>
 
                 {/* Content Area */}
-                <main className="flex-1 overflow-y-auto bg-slate-50 relative custom-scrollbar">
+                <main className="flex-1 overflow-y-auto bg-slate-950 relative custom-scrollbar">
                     {/* Page Container */}
                     <div className="p-4 sm:p-6 md:p-8 max-w-[1700px] mx-auto min-h-full">
                         {children}

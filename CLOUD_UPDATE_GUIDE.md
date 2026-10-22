@@ -63,7 +63,7 @@ git pull origin main
 3. **Rebuild the Production Bundle**:
    Replace `<YOUR_CLOUD_IP>` with your instance's public IP (e.g. port 3002 or your production API port):
    ```bash
-   VITE_API_URL="http://<YOUR_CLOUD_IP>:3002/api" npm run build
+   VITE_API_URL="http://<YOUR_CLOUD_IP>:3003/api" npm run build
    ```
 4. **Restart the Frontend Service with PM2** (or reload Nginx):
    ```bash
