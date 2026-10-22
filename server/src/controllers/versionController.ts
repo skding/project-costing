@@ -10,16 +10,22 @@ export const getVersionDetails = async (req: Request, res: Response) => {
             include: {
                 project: { include: { client: true } },
                 systems: {
+                    orderBy: { id: 'asc' },
                     include: {
                         sections: {
+                            orderBy: { id: 'asc' },
                             include: {
-                                ioRequirements: true,
-                                equipment: { include: { io: true } }
+                                ioRequirements: { orderBy: { id: 'asc' } },
+                                equipment: { 
+                                    orderBy: { id: 'asc' },
+                                    include: { io: { orderBy: { id: 'asc' } } } 
+                                }
                             }
                         }
                     }
                 },
                 components: {
+                    orderBy: { id: 'asc' },
                     include: {
                         system: true,
                         section: true,

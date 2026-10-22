@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { 
-    Plus, Edit2, Trash2, ChevronDown, Save, Download, X, Package, Layers, Check 
+    Plus, Edit2, Trash2, ChevronDown, Save, Download, X, Package, Layers, Check, FileText 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
@@ -95,6 +95,11 @@ const calculateVersionTotals = (version: ProjectVersion) => {
     let digital = 0;
     let analog = 0;
     let hli = 0;
+    let diCount = 0;
+    let doCount = 0;
+    let aiCount = 0;
+    let aoCount = 0;
+    let rtdCount = 0;
     let siteSubtotal = 0;
 
     const rates = version.costSettings || { engRateDigital: 0, engRateAnalog: 0, engRateHLI: 0, cablingCostPerIO: 0 };
@@ -121,9 +126,12 @@ const calculateVersionTotals = (version: ProjectVersion) => {
             const secTotalSite = secSiteWork + secDoc + secTraining;
 
             sec.ioRequirements.forEach(io => {
-                if (io.ioType === 'DI' || io.ioType === 'DO') secDigital += io.quantity;
-                else if (io.ioType === 'AI' || io.ioType === 'AO' || io.ioType === 'RTD') secAnalog += io.quantity;
-                else if (io.ioType === 'HLI') secHli += io.quantity;
+                if (io.ioType === 'DI') { secDigital += io.quantity; diCount += io.quantity; }
+                else if (io.ioType === 'DO') { secDigital += io.quantity; doCount += io.quantity; }
+                else if (io.ioType === 'AI') { secAnalog += io.quantity; aiCount += io.quantity; }
+                else if (io.ioType === 'AO') { secAnalog += io.quantity; aoCount += io.quantity; }
+                else if (io.ioType === 'RTD') { secAnalog += io.quantity; rtdCount += io.quantity; }
+                else if (io.ioType === 'HLI') { secHli += io.quantity; }
             });
 
             // Add IO from Equipment
@@ -131,9 +139,12 @@ const calculateVersionTotals = (version: ProjectVersion) => {
                 const eqQty = Number(eq.quantity) || 1;
                 eq.io.forEach(io => {
                     const totalQty = io.quantity * eqQty;
-                    if (io.ioType === 'DI' || io.ioType === 'DO') secDigital += totalQty;
-                    else if (io.ioType === 'AI' || io.ioType === 'AO' || io.ioType === 'RTD') secAnalog += totalQty;
-                    else if (io.ioType === 'HLI') secHli += totalQty;
+                    if (io.ioType === 'DI') { secDigital += totalQty; diCount += totalQty; }
+                    else if (io.ioType === 'DO') { secDigital += totalQty; doCount += totalQty; }
+                    else if (io.ioType === 'AI') { secAnalog += totalQty; aiCount += totalQty; }
+                    else if (io.ioType === 'AO') { secAnalog += totalQty; aoCount += totalQty; }
+                    else if (io.ioType === 'RTD') { secAnalog += totalQty; rtdCount += totalQty; }
+                    else if (io.ioType === 'HLI') { secHli += totalQty; }
                 });
             });
 
@@ -238,10 +249,56 @@ const calculateVersionTotals = (version: ProjectVersion) => {
 
     return {
         digital, analog, hli, totalIO: digital + analog + hli,
+        diCount, doCount, aiCount, aoCount, rtdCount,
         engCost, cablingCost, siteSubtotal, hardwareCost, projectLevelHardwareCost,
         siteWorkCost, documentationCost, trainingCost,
         totalNet: engCost + cablingCost + siteSubtotal + hardwareCost,
         hierarchy
+    };
+};
+
+// Maintains exact previous ordering of systems, sections, and components across refreshes/saves
+const reconcileVersionOrder = (prev: ProjectVersion | null, incoming: ProjectVersion): ProjectVersion => {
+    if (!prev) return incoming;
+
+    // 1. Maintain systems order
+    const systemOrderMap = new Map(prev.systems.map((s, idx) => [s.id, idx]));
+    const sortedSystems = [...incoming.systems].sort((a, b) => {
+        const orderA = systemOrderMap.has(a.id) ? systemOrderMap.get(a.id)! : Infinity;
+        const orderB = systemOrderMap.has(b.id) ? systemOrderMap.get(b.id)! : Infinity;
+        return orderA - orderB;
+    });
+
+    // 2. Maintain sections order for each system
+    const prevSectionOrderMap = new Map<string, number>();
+    prev.systems.forEach(sys => {
+        sys.sections?.forEach((sec, idx) => {
+            prevSectionOrderMap.set(sec.id, idx);
+        });
+    });
+
+    sortedSystems.forEach(sys => {
+        if (sys.sections) {
+            sys.sections = [...sys.sections].sort((a, b) => {
+                const orderA = prevSectionOrderMap.has(a.id) ? prevSectionOrderMap.get(a.id)! : Infinity;
+                const orderB = prevSectionOrderMap.has(b.id) ? prevSectionOrderMap.get(b.id)! : Infinity;
+                return orderA - orderB;
+            });
+        }
+    });
+
+    // 3. Maintain components order
+    const componentOrderMap = new Map(prev.components.map((c, idx) => [c.id, idx]));
+    const sortedComponents = [...incoming.components].sort((a, b) => {
+        const orderA = componentOrderMap.has(a.id) ? componentOrderMap.get(a.id)! : Infinity;
+        const orderB = componentOrderMap.has(b.id) ? componentOrderMap.get(b.id)! : Infinity;
+        return orderA - orderB;
+    });
+
+    return {
+        ...incoming,
+        systems: sortedSystems,
+        components: sortedComponents
     };
 };
 
@@ -282,7 +339,7 @@ const ProjectEditor: React.FC = () => {
                 markup: res.data.markup,
                 markupSiteWork: res.data.markupSiteWork
             });
-            setVersion(res.data);
+            setVersion(prev => reconcileVersionOrder(prev, res.data));
             // Sync markup state from fresh server data
             setMarkupPercent(parseMarkup(res.data.markup));
             setMarkupSiteWork(parseMarkup(res.data.markupSiteWork));
@@ -509,33 +566,207 @@ const ProjectEditor: React.FC = () => {
         XLSX.writeFile(wb, `Pricing_Export_Rev${version.versionNumber}.xlsx`);
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500">Loading editor...</div>;
-    if (!version) return <div className="p-12 text-center text-red-500">Version not found</div>;
+    const exportToMarkdown = () => {
+        if (!version) return;
+        const totals = calculateVersionTotals(version);
+        const marginGlobal = (Number(version.markup || 25)) / 100;
+        const marginSite = (Number(version.markupSiteWork || 25)) / 100;
+
+        const getGross = (net: number, isSiteWork: boolean = false) => {
+            const m = isSiteWork ? marginSite : marginGlobal;
+            return m < 1 ? net / (1 - m) : net;
+        };
+
+        const totalProjectPrice = getGross(totals.hardwareCost) + 
+                                 getGross(totals.engCost) + 
+                                 getGross(totals.cablingCost) + 
+                                 getGross(totals.siteWorkCost, true) + 
+                                 getGross(totals.documentationCost) + 
+                                 getGross(totals.trainingCost);
+
+        const fmt = (v: number) => `RM ${Number(v || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        let md = `# PROJECT DESIGN & COST SPECIFICATION\n\n`;
+        md += `**Company:** Clover Digital Sdn Bhd (BRN: 201501034912)\n\n`;
+        md += `**Address:** 7A Jalan PP 2/1, 47100 Puchong, Selangor\n\n`;
+        md += `**Website:** [cloverdigital.com.my](https://cloverdigital.com.my) | **Email:** enquiry@cloverdigital.com.my\n\n`;
+        md += `---\n\n`;
+
+        md += `## 1. Project Information\n\n`;
+        md += `| Attribute | Details |\n`;
+        md += `| :--- | :--- |\n`;
+        md += `| **Project Name** | ${version.project?.name || 'N/A'} |\n`;
+        md += `| **Client** | ${version.project?.client?.name || 'Standard Client'} |\n`;
+        md += `| **Site Location** | ${version.project?.location || 'N/A'} |\n`;
+        md += `| **Design Revision** | Rev ${version.versionNumber} (${version.status}) |\n`;
+        md += `| **Export Date** | ${new Date().toLocaleDateString('en-MY', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} |\n\n`;
+
+        md += `## 2. Executive Cost & Pricing Summary\n\n`;
+        md += `| Scope / Work Package | Net Cost (RM) | Target Margin | Selling Price (RM) |\n`;
+        md += `| :--- | :--- | :--- | :--- |\n`;
+        md += `| Hardware & Equipment BOM | ${fmt(totals.hardwareCost)} | ${(marginGlobal * 100).toFixed(0)}% | ${fmt(getGross(totals.hardwareCost))} |\n`;
+        md += `| Engineering Base Services | ${fmt(totals.engCost)} | ${(marginGlobal * 100).toFixed(0)}% | ${fmt(getGross(totals.engCost))} |\n`;
+        md += `| Cabling & Termination (${totals.totalIO} IO) | ${fmt(totals.cablingCost)} | ${(marginGlobal * 100).toFixed(0)}% | ${fmt(getGross(totals.cablingCost))} |\n`;
+        md += `| Modular Site Work & Mandays | ${fmt(totals.siteWorkCost)} | ${(marginSite * 100).toFixed(0)}% | ${fmt(getGross(totals.siteWorkCost, true))} |\n`;
+        md += `| Project Documentation | ${fmt(totals.documentationCost)} | ${(marginGlobal * 100).toFixed(0)}% | ${fmt(getGross(totals.documentationCost))} |\n`;
+        md += `| Site Testing & Training | ${fmt(totals.trainingCost)} | ${(marginGlobal * 100).toFixed(0)}% | ${fmt(getGross(totals.trainingCost))} |\n`;
+        md += `| **TOTAL PROJECT VALUE** | **${fmt(totals.totalNet)}** | -- | **${fmt(totalProjectPrice)}** |\n\n`;
+
+        md += `## 3. Engineering Base Rates & Markup Settings\n\n`;
+        const cs = version.costSettings || { engRateDigital: 0, engRateAnalog: 0, engRateHLI: 0, cablingCostPerIO: 0 };
+        md += `| Parameter | Configured Value |\n`;
+        md += `| :--- | :--- |\n`;
+        md += `| Digital Signal Rate (DI/DO) | RM ${cs.engRateDigital} / point |\n`;
+        md += `| Analog Signal Rate (AI/AO/RTD) | RM ${cs.engRateAnalog} / point |\n`;
+        md += `| High-Level Interface (HLI) Rate | RM ${cs.engRateHLI} / point |\n`;
+        md += `| Cabling Cost per IO | RM ${cs.cablingCostPerIO} / IO |\n`;
+        md += `| Global Equipment Markup | ${(marginGlobal * 100).toFixed(1)}% |\n`;
+        md += `| Site Services Markup | ${(marginSite * 100).toFixed(1)}% |\n\n`;
+
+        md += `## 4. Overall IO Points Distribution\n\n`;
+        md += `| Signal Type | Required Count | Description |\n`;
+        md += `| :--- | :--- | :--- |\n`;
+        md += `| **DI** | ${totals.diCount || 0} | Digital Inputs (Status, Alarms, Run Feedback) |\n`;
+        md += `| **DO** | ${totals.doCount || 0} | Digital Outputs (Command, Start/Stop, Interlocks) |\n`;
+        md += `| **AI** | ${totals.aiCount || 0} | Analog Inputs (4-20mA, 0-10V, Level/Pressure/Flow) |\n`;
+        md += `| **AO** | ${totals.aoCount || 0} | Analog Outputs (Modulating Valves, VFD Speed) |\n`;
+        md += `| **RTD** | ${totals.rtdCount || 0} | Resistance Temperature Detectors (PT100/PT1000) |\n`;
+        md += `| **HLI** | ${totals.hli || 0} | High-Level Interface Communication Registers |\n`;
+        md += `| **TOTAL I/O** | **${totals.totalIO}** | **Total System IO Points** |\n\n`;
+
+        md += `## 5. System Architecture & Section Details\n\n`;
+        (version.systems || []).forEach((sys, sysIdx) => {
+            let sysTotalIO = 0;
+            let sysDI = 0, sysDO = 0, sysAI = 0, sysAO = 0, sysRTD = 0, sysHLI = 0;
+            (sys.sections || []).forEach(sec => {
+                (sec.ioRequirements || []).forEach(io => {
+                    if (io.ioType === 'DI') sysDI += io.quantity;
+                    else if (io.ioType === 'DO') sysDO += io.quantity;
+                    else if (io.ioType === 'AI') sysAI += io.quantity;
+                    else if (io.ioType === 'AO') sysAO += io.quantity;
+                    else if (io.ioType === 'RTD') sysRTD += io.quantity;
+                    else if (io.ioType === 'HLI') sysHLI += io.quantity;
+                    sysTotalIO += io.quantity;
+                });
+                (sec.equipment || []).forEach(eq => {
+                    const q = Number(eq.quantity) || 1;
+                    (eq.io || []).forEach(io => {
+                        const count = io.quantity * q;
+                        if (io.ioType === 'DI') sysDI += count;
+                        else if (io.ioType === 'DO') sysDO += count;
+                        else if (io.ioType === 'AI') sysAI += count;
+                        else if (io.ioType === 'AO') sysAO += count;
+                        else if (io.ioType === 'RTD') sysRTD += count;
+                        else if (io.ioType === 'HLI') sysHLI += count;
+                        sysTotalIO += count;
+                    });
+                });
+            });
+
+            md += `### 5.${sysIdx + 1} System: ${sys.name}\n\n`;
+            md += `**Total System IO:** ${sysTotalIO} pts (DI: ${sysDI}, DO: ${sysDO}, AI: ${sysAI}, AO: ${sysAO}, RTD: ${sysRTD}, HLI: ${sysHLI})\n\n`;
+
+            if (sys.sections.length === 0) {
+                md += `*No sections created under this system.*\n\n`;
+            } else {
+                sys.sections.forEach((sec, secIdx) => {
+                    md += `#### 5.${sysIdx + 1}.${secIdx + 1} Section: ${sec.name}\n\n`;
+
+                    md += `**Direct IO Requirements:**\n`;
+                    if (sec.ioRequirements.length === 0) {
+                        md += `- None defined\n`;
+                    } else {
+                        sec.ioRequirements.forEach(r => {
+                            md += `- **${r.ioType}:** ${r.quantity} points\n`;
+                        });
+                    }
+                    md += `\n`;
+
+                    if (sec.equipment && sec.equipment.length > 0) {
+                        md += `**Equipment Scope:**\n\n`;
+                        md += `| Equipment Name | Qty | Associated IO |\n`;
+                        md += `| :--- | :--- | :--- |\n`;
+                        sec.equipment.forEach(eq => {
+                            const ioStr = (eq.io || []).map(i => `${i.quantity * (Number(eq.quantity) || 1)}x ${i.ioType}`).join(', ') || 'None';
+                            md += `| ${eq.name} | ${eq.quantity} | ${ioStr} |\n`;
+                        });
+                        md += `\n`;
+                    }
+
+                    md += `**Section Services & Site Work:**\n`;
+                    md += `- Mandays: RM ${Number(sec.mandays || 0).toLocaleString()}\n`;
+                    md += `- Mobilization: RM ${Number(sec.mobilization || 0).toLocaleString()}\n`;
+                    md += `- Lodging: RM ${Number(sec.lodging || 0).toLocaleString()}\n`;
+                    md += `- Documentation: RM ${Number(sec.documentation || 0).toLocaleString()}\n`;
+                    md += `- Training: RM ${Number(sec.training || 0).toLocaleString()}\n\n`;
+                });
+            }
+        });
+
+        md += `## 6. Structured Bill of Materials (BOM)\n\n`;
+        md += `| Scope | Component / Item | Brand / Model | Category | Qty | Unit Price (RM) | Total Price (RM) |\n`;
+        md += `| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n`;
+
+        const projComps = (version.components || []).filter(c => !c.systemId && !c.sectionId);
+        projComps.forEach(c => {
+            md += `| Project Level | ${c.componentName} | ${c.catalog?.brand || 'Generic'} ${c.catalog?.model || ''} | ${c.catalog?.category || 'Misc'} | ${c.quantity} | ${Number(c.snapshottedPrice).toLocaleString()} | ${(Number(c.snapshottedPrice) * c.quantity).toLocaleString()} |\n`;
+        });
+
+        (version.systems || []).forEach(sys => {
+            const sysComps = (version.components || []).filter(c => c.systemId === sys.id && !c.sectionId);
+            sysComps.forEach(c => {
+                md += `| System: ${sys.name} | ${c.componentName} | ${c.catalog?.brand || 'Generic'} ${c.catalog?.model || ''} | ${c.catalog?.category || 'Misc'} | ${c.quantity} | ${Number(c.snapshottedPrice).toLocaleString()} | ${(Number(c.snapshottedPrice) * c.quantity).toLocaleString()} |\n`;
+            });
+            (sys.sections || []).forEach(sec => {
+                const secComps = (version.components || []).filter(c => c.sectionId === sec.id);
+                secComps.forEach(c => {
+                    md += `| ${sys.name} > ${sec.name} | ${c.componentName} | ${c.catalog?.brand || 'Generic'} ${c.catalog?.model || ''} | ${c.catalog?.category || 'Misc'} | ${c.quantity} | ${Number(c.snapshottedPrice).toLocaleString()} | ${(Number(c.snapshottedPrice) * c.quantity).toLocaleString()} |\n`;
+                });
+            });
+        });
+
+        md += `\n---\n`;
+        md += `*Exported from Clover Digital Project Costing Platform (v1.0.0).*\n`;
+
+        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const sanitizedName = (version.project?.name || 'Project').replace(/[^a-zA-Z0-9_-]/g, '_');
+        link.download = `${sanitizedName}_Rev${version.versionNumber}_Design.md`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    if (loading) return <div className="p-12 text-center text-slate-500 font-bold text-xs uppercase tracking-widest animate-pulse">Loading editor...</div>;
+    if (!version) return <div className="p-12 text-center text-red-500 font-bold text-xs uppercase tracking-widest">Version not found</div>;
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-20">
+        <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
             {/* Header */}
-            <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div>
                     <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tight">{version.project?.name || 'Loading...'}</h1>
-                            <span className="text-slate-300 mx-2">/</span>
-                            <span className="text-xl font-bold text-slate-500">{version.project?.client?.name || 'No Client'}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">{version.project?.name || 'Loading...'}</h1>
+                            <span className="text-slate-300">/</span>
+                            <span className="text-base sm:text-lg font-bold text-slate-500">{version.project?.client?.name || 'No Client'}</span>
                         </div>
                         {version.project?.location && (
-                            <div className="flex items-center gap-2 text-blue-500 font-bold text-xs uppercase tracking-widest">
+                            <div className="flex items-center gap-1.5 text-blue-600 font-bold text-xs uppercase tracking-wider">
                                 <Plus size={12} /> {version.project.location}
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-3 text-sm font-medium text-slate-500 mt-2">
-                        <div className="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full text-slate-700">
-                            <span className="text-[10px] font-bold uppercase tracking-wider opacity-50">Rev</span>
+                    <div className="flex items-center gap-3 text-xs sm:text-sm font-medium text-slate-500 mt-2">
+                        <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1 rounded-full text-slate-700">
+                            <span className="text-[10px] font-black uppercase tracking-wider opacity-60">Rev</span>
                             <select
                                 value={version.id}
                                 onChange={(e) => navigate(`/projects/${projectId}/versions/${e.target.value}`)}
-                                className="bg-transparent border-none font-bold text-slate-900 focus:ring-0 cursor-pointer p-0"
+                                className="bg-transparent border-none font-bold text-slate-900 focus:ring-0 cursor-pointer p-0 text-xs"
                             >
                                 {allVersions.map((v: any) => (
                                     <option key={v.id} value={v.id}>
@@ -550,30 +781,37 @@ const ProjectEditor: React.FC = () => {
                         </span>
                     </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full lg:w-auto">
+                    <button
+                        onClick={exportToMarkdown}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 bg-blue-50 text-blue-700 font-bold rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs uppercase tracking-wider"
+                        title="Export full project specification as Markdown"
+                    >
+                        <FileText size={15} /> Export MD
+                    </button>
                     <button
                         onClick={exportToExcel}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-green-50 text-green-700 font-bold rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm text-xs uppercase tracking-wider"
                     >
-                        <Download size={18} /> Export Excel
+                        <Download size={15} /> Export Excel
                     </button>
                     <button
                         onClick={saveAsNewVersion}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-sm text-xs uppercase tracking-wider"
                     >
-                        <Layers size={18} /> Save As New
+                        <Layers size={15} /> Save As New
                     </button>
                     <button
                         onClick={addSystem}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-200"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20 text-xs uppercase tracking-wider"
                     >
-                        <Plus size={18} /> New System
+                        <Plus size={15} /> New System
                     </button>
                 </div>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
+            <div className="flex gap-1.5 p-1 bg-slate-100 rounded-2xl w-full sm:w-fit overflow-x-auto custom-scrollbar">
                 {[
                     { id: 'definition', label: '1. IO Design' },
                     { id: 'hardware', label: '2. Bill of Materials' },
@@ -584,7 +822,7 @@ const ProjectEditor: React.FC = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
                         className={cn(
-                            "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                            "px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap shrink-0",
                             activeTab === tab.id
                                 ? "bg-white text-blue-600 shadow-sm"
                                 : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
@@ -640,7 +878,7 @@ const ProjectEditor: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'hardware' && <AdvancedBOM version={version} onUpdate={fetchVersionDetails} />}
+                {activeTab === 'hardware' && <AdvancedBOM version={version} onUpdate={fetchVersionDetails} setVersion={setVersion} />}
                 {activeTab === 'site' && <SiteSettings version={version} onUpdate={fetchVersionDetails} />}
                 {activeTab === 'summary' && <CostSummary version={version} onUpdate={fetchVersionDetails} markupPercent={markupPercent} setMarkupPercent={setMarkupPercent} markupSiteWork={markupSiteWork} setMarkupSiteWork={setMarkupSiteWork} />}
 
@@ -1029,7 +1267,11 @@ const SectionEditor: React.FC<{
 
 // --- Advanced BOM Component ---
 
-const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> = ({ version, onUpdate }) => {
+const AdvancedBOM: React.FC<{ 
+    version: ProjectVersion; 
+    onUpdate: () => void;
+    setVersion?: React.Dispatch<React.SetStateAction<ProjectVersion | null>>;
+}> = ({ version, onUpdate, setVersion }) => {
     const [catalog, setCatalog] = useState<any[]>([]);
     const [activeTarget, setActiveTarget] = useState<{ type: 'project' | 'system' | 'section'; id?: string } | null>(null);
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -1128,11 +1370,22 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
 
     const updateComponentQty = async (id: string, qty: number) => {
         if (qty < 1) return;
+        // Optimistic update so position and value change instantly with zero jumping
+        if (setVersion) {
+            setVersion(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    components: prev.components.map(c => c.id === id ? { ...c, quantity: qty } : c)
+                };
+            });
+        }
         try {
             await api.put(`/versions/components/${id}`, { quantity: qty });
             onUpdate();
         } catch (error) {
             console.error(error);
+            onUpdate();
         }
     };
 
@@ -1161,38 +1414,41 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
     };
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8 items-start">
             {/* Left: Architecture & Hierarchy */}
-            <div className="lg:col-span-3 space-y-10">
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Structured Bill of Materials</h3>
-                        <div className="flex gap-4">
+            <div className="lg:col-span-3 space-y-8">
+                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+                    <div className="p-5 sm:p-7 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div>
+                            <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Structured Bill of Materials</h3>
+                            <p className="text-slate-400 text-xs font-medium">Select a target level below to add items from the catalog</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2.5">
                             <button
                                 onClick={addMiscItem}
-                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md"
+                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-all shadow-sm"
                             >
                                 <Plus size={14} /> Add Misc. Item
                             </button>
-                            <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                                <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
                                 <span className="text-[10px] font-black uppercase text-slate-500">Live Assignment Mode</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="p-8 space-y-8">
+                    <div className="p-4 sm:p-7 space-y-6">
                         {/* Project Level */}
-                        <div className={cn("p-6 rounded-[2rem] border-2 transition-all cursor-pointer",
-                            activeTarget?.type === 'project' ? "border-blue-600 bg-blue-50/20 ring-4 ring-blue-50" : "border-slate-50 hover:border-slate-200")}
+                        <div className={cn("p-5 sm:p-6 rounded-2xl border-2 transition-all cursor-pointer",
+                            activeTarget?.type === 'project' ? "border-blue-600 bg-blue-50/20 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-200")}
                             onClick={() => setActiveTarget({ type: 'project' })}>
-                            <div className="flex justify-between items-center mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg">
-                                        <Layers size={20} />
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="flex items-center gap-3.5">
+                                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md">
+                                        <Layers size={18} />
                                     </div>
                                     <div>
-                                        <h4 className="font-black text-slate-900 uppercase tracking-tight">Project Level Hardware</h4>
+                                        <h4 className="font-black text-slate-900 uppercase tracking-tight text-sm sm:text-base">Project Level Hardware</h4>
                                         <p className="text-[10px] font-bold text-slate-400">Software, Workstations, Global Infra</p>
                                     </div>
                                 </div>
@@ -1207,190 +1463,231 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                         </div>
 
                         {/* System Hierarchy */}
-                        {version.systems.map(sys => (
-                            <div key={sys.id} className="space-y-6">
-                                <div className={cn("p-6 rounded-[2rem] border-2 transition-all cursor-pointer bg-slate-50/30",
-                                    activeTarget?.type === 'system' && activeTarget.id === sys.id ? "border-blue-600 bg-blue-50/20 ring-4 ring-blue-50" : "border-slate-50 hover:border-slate-200")}
-                                    onClick={() => setActiveTarget({ type: 'system', id: sys.id })}>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div
-                                                className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-600 shadow-sm hover:bg-slate-100 transition-colors"
-                                                onClick={(e) => { e.stopPropagation(); toggleCollapse(sys.id); }}
-                                            >
-                                                <ChevronDown size={20} className={cn("transition-transform duration-300", collapsed.has(sys.id) ? "-rotate-90" : "rotate-0")} />
-                                            </div>
-                                            <h4 className="font-black text-slate-900 uppercase tracking-tight">System: {sys.name}</h4>
-                                        </div>
-                                        {activeTarget?.type === 'system' && activeTarget.id === sys.id && <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase">Targetting</span>}
-                                    </div>
-                                    {!collapsed.has(sys.id) && (
-                                        <ComponentsList
-                                            components={version.components.filter(c => c.systemId === sys.id && !c.sectionId)}
-                                            onRemove={removeComponent}
-                                            onUpdateQty={updateComponentQty}
-                                            onUpdateItem={updateComponentItem}
-                                        />
-                                    )}
-                                </div>
-
-                                {!collapsed.has(sys.id) && sys.sections.map(sec => {
-                                    const requiredIO = sec.ioRequirements.reduce((acc, curr) => ({ ...acc, [curr.ioType]: (acc[curr.ioType] || 0) + curr.quantity }), {} as any);
-
-                                    // Add IO from Equipment
-                                    (sec.equipment || []).forEach(eq => {
-                                        const eqQty = Number(eq.quantity) || 1;
-                                        eq.io.forEach(io => {
-                                            requiredIO[io.ioType] = (requiredIO[io.ioType] || 0) + (io.quantity * eqQty);
-                                        });
+                        {version.systems.map(sys => {
+                            // Calculate total IO requirements across all sections under this system (Item 4)
+                            const systemTotalIO = (sys.sections || []).reduce((acc: any, sec: any) => {
+                                (sec.ioRequirements || []).forEach((io: any) => {
+                                    acc[io.ioType] = (acc[io.ioType] || 0) + Number(io.quantity || 0);
+                                    acc.total = (acc.total || 0) + Number(io.quantity || 0);
+                                });
+                                (sec.equipment || []).forEach((eq: any) => {
+                                    const eqQty = Number(eq.quantity) || 1;
+                                    (eq.io || []).forEach((io: any) => {
+                                        const count = Number(io.quantity || 0) * eqQty;
+                                        acc[io.ioType] = (acc[io.ioType] || 0) + count;
+                                        acc.total = (acc.total || 0) + count;
                                     });
+                                });
+                                return acc;
+                            }, { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0, total: 0 });
 
-                                    const providedIO = calculateProvidedIO(sec.id);
-
-                                    return (
-                                        <div key={sec.id} className={cn("ml-10 p-8 rounded-[2rem] border-2 transition-all cursor-pointer bg-white relative overflow-hidden",
-                                            activeTarget?.type === 'section' && activeTarget.id === sec.id ? "border-blue-600 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-200")}
-                                            onClick={() => setActiveTarget({ type: 'section', id: sec.id })}>
-                                            <div className="flex justify-between items-start mb-8">
-                                                <div className="flex items-center gap-4">
-                                                    <div
-                                                        className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors"
-                                                        onClick={(e) => { e.stopPropagation(); toggleCollapse(sec.id); }}
-                                                    >
-                                                        <ChevronDown size={16} className={cn("transition-transform duration-300", collapsed.has(sec.id) ? "-rotate-90" : "rotate-0")} />
-                                                    </div>
-                                                    <div>
-                                                        <h5 className="font-black text-slate-800 text-base uppercase tracking-tight">{sec.name}</h5>
-                                                        <p className="text-[10px] font-bold text-slate-400">Assigned Hardware & IO Analysis</p>
-                                                    </div>
+                            return (
+                                <div key={sys.id} className="space-y-4">
+                                    <div className={cn("p-5 sm:p-6 rounded-2xl border-2 transition-all cursor-pointer bg-slate-50/40",
+                                        activeTarget?.type === 'system' && activeTarget.id === sys.id ? "border-blue-600 bg-blue-50/20 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-200")}
+                                        onClick={() => setActiveTarget({ type: 'system', id: sys.id })}>
+                                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div
+                                                    className="w-9 h-9 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-600 shadow-sm hover:bg-slate-100 transition-colors shrink-0"
+                                                    onClick={(e) => { e.stopPropagation(); toggleCollapse(sys.id); }}
+                                                >
+                                                    <ChevronDown size={18} className={cn("transition-transform duration-300", collapsed.has(sys.id) ? "-rotate-90" : "rotate-0")} />
                                                 </div>
-                                                {activeTarget?.type === 'section' && activeTarget.id === sec.id && <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase">Targetting</span>}
+                                                <h4 className="font-black text-slate-900 uppercase tracking-tight text-sm sm:text-base">System: {sys.name}</h4>
                                             </div>
-
-                                            {!collapsed.has(sec.id) && (
-                                                <>
-
-                                                    {/* IO Comparison Table */}
-                                                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-8">
-                                                        {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(type => {
-                                                            const req = requiredIO[type] || 0;
-                                                            const prov = providedIO[type] || 0;
-                                                            const diff = prov - req;
-                                                            const perc = req > 0 ? (prov / req) * 100 : 0;
-
-                                                            const getStatusColor = () => {
-                                                                if (perc < 100) return 'red';
-                                                                if (perc < 130) return 'amber';
-                                                                return 'emerald';
-                                                            };
-                                                            const color = getStatusColor();
-                                                            const colorClasses = {
-                                                                red: 'text-red-500 bg-red-500 bg-red-50',
-                                                                amber: 'text-amber-500 bg-amber-500 bg-amber-50',
-                                                                emerald: 'text-emerald-600 bg-emerald-500 bg-emerald-50'
-                                                            };
-
-                                                            return (
-                                                                <div key={type} className={cn("p-4 rounded-2xl border transition-all",
-                                                                    req > 0 ? "bg-slate-50 border-slate-100" : "bg-white border-slate-50 opacity-40")}>
-                                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">{type}</div>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex justify-between text-[10px] font-bold">
-                                                                            <span className="text-slate-500">Req: {req}</span>
-                                                                            <span className={colorClasses[color].split(' ')[0]}>Prov: {prov}</span>
-                                                                        </div>
-                                                                        <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-                                                                            <div className={cn("h-full transition-all", colorClasses[color].split(' ')[1])} style={{ width: `${Math.min(perc, 100)}%` }}></div>
-                                                                        </div>
-                                                                        <div className="flex justify-between items-center mt-2">
-                                                                            <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded-md",
-                                                                                colorClasses[color].split(' ')[2], colorClasses[color].split(' ')[0])}>
-                                                                                {diff >= 0 ? `+${diff}` : diff} Spare
-                                                                            </span>
-                                                                            {req > 0 && <span className="text-[8px] font-medium text-slate-400">{perc.toFixed(0)}%</span>}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    <ComponentsList
-                                                        components={version.components.filter(c => c.sectionId === sec.id)}
-                                                        onRemove={removeComponent}
-                                                        onUpdateQty={updateComponentQty}
-                                                        onUpdateItem={updateComponentItem}
-                                                    />
-                                                </>
+                                            {activeTarget?.type === 'system' && activeTarget.id === sys.id && (
+                                                <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase w-fit">Targetting</span>
                                             )}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
+
+                                        {/* Total IO Summary at System Area (Item 4) */}
+                                        <div className="flex flex-wrap items-center gap-2 pt-2.5 mt-2 border-t border-slate-200/60">
+                                            <div className="px-2.5 py-1 bg-blue-50 border border-blue-200/80 rounded-lg flex items-center gap-1.5">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-blue-700">Total System I/O:</span>
+                                                <span className="text-xs font-black text-blue-950">{systemTotalIO.total} pts</span>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-black">
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200/60 rounded-md text-slate-600">DI: <span className="text-slate-900">{systemTotalIO.DI}</span></span>
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200/60 rounded-md text-slate-600">DO: <span className="text-slate-900">{systemTotalIO.DO}</span></span>
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200/60 rounded-md text-slate-600">AI: <span className="text-slate-900">{systemTotalIO.AI}</span></span>
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200/60 rounded-md text-slate-600">AO: <span className="text-slate-900">{systemTotalIO.AO}</span></span>
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200/60 rounded-md text-slate-600">RTD: <span className="text-slate-900">{systemTotalIO.RTD}</span></span>
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200/60 rounded-md text-slate-600">HLI: <span className="text-slate-900">{systemTotalIO.HLI}</span></span>
+                                            </div>
+                                        </div>
+
+                                        {!collapsed.has(sys.id) && (
+                                            <div className="mt-4">
+                                                <ComponentsList
+                                                    components={version.components.filter(c => c.systemId === sys.id && !c.sectionId)}
+                                                    onRemove={removeComponent}
+                                                    onUpdateQty={updateComponentQty}
+                                                    onUpdateItem={updateComponentItem}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {!collapsed.has(sys.id) && sys.sections.map(sec => {
+                                        const requiredIO = sec.ioRequirements.reduce((acc, curr) => ({ ...acc, [curr.ioType]: (acc[curr.ioType] || 0) + curr.quantity }), {} as any);
+
+                                        // Add IO from Equipment
+                                        (sec.equipment || []).forEach(eq => {
+                                            const eqQty = Number(eq.quantity) || 1;
+                                            eq.io.forEach(io => {
+                                                requiredIO[io.ioType] = (requiredIO[io.ioType] || 0) + (io.quantity * eqQty);
+                                            });
+                                        });
+
+                                        const providedIO = calculateProvidedIO(sec.id);
+
+                                        return (
+                                            <div key={sec.id} className={cn("ml-2 sm:ml-6 lg:ml-8 p-4 sm:p-6 rounded-2xl border-2 transition-all cursor-pointer bg-white relative overflow-hidden",
+                                                activeTarget?.type === 'section' && activeTarget.id === sec.id ? "border-blue-600 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-200")}
+                                                onClick={() => setActiveTarget({ type: 'section', id: sec.id })}>
+                                                <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 hover:bg-blue-200 transition-colors shrink-0"
+                                                            onClick={(e) => { e.stopPropagation(); toggleCollapse(sec.id); }}
+                                                        >
+                                                            <ChevronDown size={16} className={cn("transition-transform duration-300", collapsed.has(sec.id) ? "-rotate-90" : "rotate-0")} />
+                                                        </div>
+                                                        <div>
+                                                            <h5 className="font-black text-slate-800 text-sm sm:text-base uppercase tracking-tight">{sec.name}</h5>
+                                                            <p className="text-[10px] font-bold text-slate-400">Assigned Hardware & IO Analysis</p>
+                                                        </div>
+                                                    </div>
+                                                    {activeTarget?.type === 'section' && activeTarget.id === sec.id && <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase w-fit">Targetting</span>}
+                                                </div>
+
+                                                {!collapsed.has(sec.id) && (
+                                                    <>
+                                                        {/* IO Comparison Table */}
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-6">
+                                                            {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(type => {
+                                                                const req = requiredIO[type] || 0;
+                                                                const prov = providedIO[type] || 0;
+                                                                const diff = prov - req;
+                                                                const perc = req > 0 ? (prov / req) * 100 : 0;
+
+                                                                const getStatusColor = () => {
+                                                                    if (perc < 100) return 'red';
+                                                                    if (perc < 130) return 'amber';
+                                                                    return 'emerald';
+                                                                };
+                                                                const color = getStatusColor();
+                                                                const colorClasses = {
+                                                                    red: 'text-red-500 bg-red-500 bg-red-50',
+                                                                    amber: 'text-amber-500 bg-amber-500 bg-amber-50',
+                                                                    emerald: 'text-emerald-600 bg-emerald-500 bg-emerald-50'
+                                                                };
+
+                                                                return (
+                                                                    <div key={type} className={cn("p-3 rounded-xl border transition-all",
+                                                                        req > 0 ? "bg-slate-50 border-slate-100" : "bg-white border-slate-50 opacity-40")}>
+                                                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2">{type}</div>
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex justify-between text-[10px] font-bold">
+                                                                                <span className="text-slate-500">Req: {req}</span>
+                                                                                <span className={colorClasses[color].split(' ')[0]}>Prov: {prov}</span>
+                                                                            </div>
+                                                                            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
+                                                                                <div className={cn("h-full transition-all", colorClasses[color].split(' ')[1])} style={{ width: `${Math.min(perc, 100)}%` }}></div>
+                                                                            </div>
+                                                                            <div className="flex justify-between items-center mt-1.5">
+                                                                                <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded-md",
+                                                                                    colorClasses[color].split(' ')[2], colorClasses[color].split(' ')[0])}>
+                                                                                    {diff >= 0 ? `+${diff}` : diff}
+                                                                                </span>
+                                                                                {req > 0 && <span className="text-[8px] font-medium text-slate-400">{perc.toFixed(0)}%</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        <ComponentsList
+                                                            components={version.components.filter(c => c.sectionId === sec.id)}
+                                                            onRemove={removeComponent}
+                                                            onUpdateQty={updateComponentQty}
+                                                            onUpdateItem={updateComponentItem}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
-            {/* Right: Catalog */}
-            <div className="space-y-6">
-                <div className="sticky top-24">
-                    <div className="flex flex-col gap-4 mb-6">
-                        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+            {/* Right: Catalog - Separate sticky container with independent scroll (Item 5) */}
+            <div className="lg:col-span-1 w-full">
+                <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)] flex flex-col bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-5 shadow-sm">
+                    {/* Fixed Header in catalog panel */}
+                    <div className="shrink-0 space-y-3 mb-3">
+                        <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl">
                             <button
                                 onClick={() => setCatalogTab('components')}
-                                className={cn("flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                                    catalogTab === 'components' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500")}
+                                className={cn("flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                                    catalogTab === 'components' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
                             >
                                 Components
                             </button>
                             <button
                                 onClick={() => setCatalogTab('packages')}
-                                className={cn("flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                                    catalogTab === 'packages' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500")}
+                                className={cn("flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                                    catalogTab === 'packages' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
                             >
                                 Packages
                             </button>
                         </div>
 
                         {catalogTab === 'components' && (
-                            <div className="flex justify-between items-center px-2">
-                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Catalog</h3>
+                            <div className="flex justify-between items-center px-1">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Catalog</h3>
                                 <select
                                     value={categoryFilter}
                                     onChange={(e) => setCategoryFilter(e.target.value)}
-                                    className="bg-transparent border-none p-0 text-[10px] font-black uppercase tracking-widest text-blue-600 outline-none cursor-pointer"
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-wider text-blue-600 outline-none cursor-pointer max-w-[140px] truncate"
                                 >
-                                    <option value="all">All</option>
+                                    <option value="all">All Categories</option>
                                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                 </select>
                             </div>
                         )}
                         {catalogTab === 'packages' && (
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Hardware Packages</h3>
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1">Hardware Packages</h3>
                         )}
                     </div>
 
-                    <div className="bg-white border-2 border-slate-50 rounded-[2.5rem] p-6 space-y-4 max-h-[70vh] overflow-y-auto shadow-sm custom-scrollbar">
+                    {/* Independently Scrollable Catalog List */}
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar min-h-[300px] max-h-[60vh] lg:max-h-none">
                         {catalogTab === 'components' ? (
                             filteredCatalog.map(item => (
                                 <div key={item.id}
-                                    className="p-5 border-2 border-slate-50 rounded-3xl group hover:border-blue-100 hover:bg-blue-50/20 transition-all cursor-pointer relative"
+                                    className="p-4 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/20 rounded-2xl group transition-all cursor-pointer relative"
                                     onClick={() => addComponent(item.id)}>
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1">
-                                            <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{item.category}</div>
-                                            <div className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{item.model}</div>
-                                            <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{item.brand} • RM{Number(item.listPrice).toLocaleString()}</div>
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-[9px] font-black text-blue-600 uppercase tracking-wider mb-0.5 truncate">{item.category}</div>
+                                            <div className="text-xs font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight truncate">{item.model}</div>
+                                            <div className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-wider truncate">{item.brand} • RM{Number(item.listPrice).toLocaleString()}</div>
                                         </div>
-                                        <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-300 group-hover:text-blue-600 group-hover:border-blue-100 transition-all">
-                                            <Plus size={16} />
+                                        <div className="p-1.5 bg-white rounded-lg shadow-sm border border-slate-100 text-slate-400 group-hover:text-blue-600 group-hover:border-blue-100 transition-all shrink-0">
+                                            <Plus size={14} />
                                         </div>
                                     </div>
                                     {item.ioSpecs && Object.keys(item.ioSpecs).length > 0 && (
-                                        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
+                                        <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-1">
                                             {Object.entries(item.ioSpecs as Record<string, any>).map(([type, qty]) => (
-                                                <span key={type} className="text-[8px] font-black bg-slate-100 px-2 py-0.5 rounded-md text-slate-500 uppercase tracking-widest border border-slate-200/50">
+                                                <span key={type} className="text-[8px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 uppercase border border-slate-200/40">
                                                     {String(qty)} {type}
                                                 </span>
                                             ))}
@@ -1401,23 +1698,23 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                         ) : (
                             packages.map(pkg => (
                                 <div key={pkg.id}
-                                    className="p-6 border-2 border-slate-50 rounded-[2rem] group hover:border-slate-900 hover:bg-slate-50 transition-all cursor-pointer relative"
+                                    className="p-5 border border-slate-100 hover:border-slate-900 hover:bg-slate-50 rounded-2xl group transition-all cursor-pointer relative"
                                     onClick={() => addPackage(pkg.id)}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="p-3 bg-slate-100 rounded-xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all">
-                                            <Package size={20} />
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="p-2 bg-slate-100 rounded-xl text-slate-500 group-hover:bg-slate-900 group-hover:text-white transition-all">
+                                            <Package size={16} />
                                         </div>
-                                        <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-300 group-hover:text-slate-900 transition-all">
-                                            <Plus size={16} />
+                                        <div className="p-1.5 bg-white rounded-lg shadow-sm border border-slate-100 text-slate-400 group-hover:text-slate-900 transition-all">
+                                            <Plus size={14} />
                                         </div>
                                     </div>
-                                    <div className="text-xs font-black text-slate-900 uppercase tracking-tight mb-1 group-hover:text-slate-900">{pkg.name}</div>
+                                    <div className="text-xs font-black text-slate-900 uppercase tracking-tight mb-1">{pkg.name}</div>
                                     <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider line-clamp-2">{pkg.description || 'Standard hardware package.'}</div>
-                                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1.5">
+                                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-1">
                                         {pkg.items.slice(0, 3).map((item: any) => (
-                                            <div key={item.id} className="flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                                                <span>{item.catalog?.model}</span>
-                                                <span className="text-slate-900">x{item.quantity}</span>
+                                            <div key={item.id} className="flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-wider">
+                                                <span className="truncate pr-2">{item.catalog?.model}</span>
+                                                <span className="text-slate-900 shrink-0">x{item.quantity}</span>
                                             </div>
                                         ))}
                                         {pkg.items.length > 3 && <div className="text-[8px] font-black text-blue-600 uppercase">+{pkg.items.length - 3} more items</div>}
@@ -1425,18 +1722,30 @@ const AdvancedBOM: React.FC<{ version: ProjectVersion; onUpdate: () => void }> =
                                 </div>
                             ))
                         )}
-                        {catalogTab === 'components' && catalog.length === 0 && <div className="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">Catalog synchronization required...</div>}
-                        {catalogTab === 'packages' && packages.length === 0 && <div className="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">No packages defined in library...</div>}
+                        {catalogTab === 'components' && catalog.length === 0 && <div className="text-center py-16 text-slate-300 font-bold uppercase text-[10px] tracking-wider">Catalog empty...</div>}
+                        {catalogTab === 'packages' && packages.length === 0 && <div className="text-center py-16 text-slate-300 font-bold uppercase text-[10px] tracking-wider">No packages defined...</div>}
                     </div>
+
+                    {/* Active Target Indicator */}
                     {activeTarget && (
-                        <div className="mt-6 p-6 bg-blue-600 rounded-[2rem] text-white shadow-xl shadow-blue-200 animate-in zoom-in-95 duration-300">
-                            <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1 opacity-60">Currently Targetting</div>
-                            <div className="text-sm font-black uppercase truncate">
-                                {activeTarget.type === 'project' ? 'Project Global' :
-                                    activeTarget.type === 'system' ? (version.systems.find(s => s.id === activeTarget.id)?.name || 'Unknown System') :
-                                        (version.systems.flatMap(s => s.sections).find(s => s.id === activeTarget.id)?.name || 'Unknown Section')}
+                        <div className="mt-4 p-3.5 bg-blue-600 rounded-2xl text-white shadow-md shadow-blue-500/20 shrink-0 animate-in zoom-in-95 duration-200">
+                            <div className="flex justify-between items-center">
+                                <div className="min-w-0 pr-2">
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-blue-200">Target Selected</div>
+                                    <div className="text-xs font-black uppercase truncate">
+                                        {activeTarget.type === 'project' ? 'Project Global' :
+                                            activeTarget.type === 'system' ? (version.systems.find(s => s.id === activeTarget.id)?.name || 'System') :
+                                                (version.systems.flatMap(s => s.sections).find(s => s.id === activeTarget.id)?.name || 'Section')}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setActiveTarget(null)}
+                                    className="p-1 hover:bg-white/20 rounded-lg text-white/80 hover:text-white transition-colors"
+                                    title="Deselect Target"
+                                >
+                                    <X size={14} />
+                                </button>
                             </div>
-                            <button onClick={() => setActiveTarget(null)} className="w-full mt-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Cancel Mode</button>
                         </div>
                     )}
                 </div>
@@ -1558,21 +1867,21 @@ const SiteSettings: React.FC<{ version: ProjectVersion; onUpdate: () => void }> 
     };
 
     return (
-        <div className="space-y-12 pb-20">
+        <div className="space-y-8 sm:space-y-12 pb-20">
             {/* Engineering Rates Section */}
-            <div className="bg-white border border-slate-100 rounded-[3rem] p-12 shadow-sm">
-                <div className="mb-10">
-                    <h3 className="text-3xl font-black text-slate-900 tracking-tight">Engineering Base Rates</h3>
-                    <p className="text-sm font-bold text-slate-400 mt-2 uppercase tracking-widest">Global rates per IO type for this version</p>
+            <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-10 shadow-sm">
+                <div className="mb-6 sm:mb-8">
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Engineering Base Rates</h3>
+                    <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">Global rates per IO type for this version</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
                     {[
                         { label: 'Digital (DI/DO)', key: 'engRateDigital', count: totals.digital },
                         { label: 'Analog (AI/AO/RTD)', key: 'engRateAnalog', count: totals.analog },
                         { label: 'HLI / Integration', key: 'engRateHLI', count: totals.hli },
                     ].map(field => (
-                        <div key={field.key} className="space-y-4 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                        <div key={field.key} className="space-y-3 p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{field.label}</label>
                             <div className="relative group">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">RM</span>
@@ -1580,37 +1889,37 @@ const SiteSettings: React.FC<{ version: ProjectVersion; onUpdate: () => void }> 
                                     type="number"
                                     value={(settings as any)[field.key]}
                                     onChange={e => setSettings({ ...settings, [field.key]: Number(e.target.value) })}
-                                    className="w-full bg-white border-2 border-slate-100 rounded-xl pl-12 pr-4 py-3 font-black text-lg text-slate-900 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full bg-white border-2 border-slate-100 rounded-xl pl-12 pr-4 py-2.5 font-black text-base text-slate-900 focus:border-blue-500 outline-none transition-all"
                                 />
                             </div>
-                            <div className="flex justify-between items-center pt-2">
-                                <span className="text-[9px] font-bold text-slate-400 uppercase">Total {field.count} IO</span>
-                                <span className="text-[10px] font-black text-blue-600">Subtotal: RM{(field.count * (settings as any)[field.key]).toLocaleString()}</span>
+                            <div className="flex justify-between items-center pt-1 text-[9px] font-bold">
+                                <span className="text-slate-400 uppercase">Total {field.count} IO</span>
+                                <span className="text-blue-600 font-black">Subtotal: RM{(field.count * (settings as any)[field.key]).toLocaleString()}</span>
                             </div>
                         </div>
                     ))}
                 </div>
 
-                <div className="space-y-4 p-6 bg-blue-50/30 rounded-3xl border border-blue-100 mb-10">
-                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Global Cabling & Installation (RM/IO)</label>
-                    <div className="flex items-center gap-6">
-                        <div className="relative group w-64">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 font-black text-sm">RM</span>
+                <div className="space-y-3 p-5 bg-blue-50/40 rounded-2xl border border-blue-100 mb-8">
+                    <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest block">Global Cabling & Installation (RM/IO)</label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6">
+                        <div className="relative group w-full sm:w-60">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500 font-black text-sm">RM</span>
                             <input
                                 type="number"
                                 value={settings.cablingCostPerIO}
                                 onChange={e => setSettings({ ...settings, cablingCostPerIO: Number(e.target.value) })}
-                                className="w-full bg-white border-2 border-blue-100 rounded-xl pl-12 pr-4 py-3 font-black text-lg text-slate-900 focus:border-blue-500 outline-none transition-all"
+                                className="w-full bg-white border-2 border-blue-100 rounded-xl pl-12 pr-4 py-2.5 font-black text-base text-slate-900 focus:border-blue-500 outline-none transition-all"
                             />
                         </div>
-                        <div className="text-[10px] font-black text-blue-600 uppercase">
+                        <div className="text-[11px] font-black text-blue-700 uppercase">
                             Project Total: RM{(totals.totalIO * settings.cablingCostPerIO).toLocaleString()}
                         </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-6 border-t border-slate-50">
-                    <button onClick={handleSaveSettings} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95">
+                <div className="flex justify-end pt-5 border-t border-slate-100">
+                    <button onClick={handleSaveSettings} className="w-full sm:w-auto bg-slate-900 text-white px-6 sm:px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-blue-600 transition-all shadow-md active:scale-95">
                         Apply Global Rates
                     </button>
                 </div>
@@ -1618,12 +1927,12 @@ const SiteSettings: React.FC<{ version: ProjectVersion; onUpdate: () => void }> 
 
             {/* Site Work & Modular Costs */}
             <div className="space-y-6">
-                <h3 className="text-xl font-black text-slate-900 ml-6 uppercase tracking-widest">Modular Site Work & Services</h3>
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 ml-2 uppercase tracking-wider">Modular Site Work & Services</h3>
                 {version.systems.map(sys => (
                     <div key={sys.id} className="space-y-4">
-                        <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm">
-                            <div className="flex justify-between items-start mb-6">
-                                <h4 className="font-black text-slate-900 uppercase tracking-tight">System: {sys.name}</h4>
+                        <div className="bg-white border border-slate-100 rounded-3xl p-5 sm:p-7 shadow-sm">
+                            <div className="flex justify-between items-start mb-5">
+                                <h4 className="font-black text-slate-900 uppercase tracking-tight text-base sm:text-lg">System: {sys.name}</h4>
                             </div>
                             <SiteWorkInputs
                                 data={sys}
@@ -1633,8 +1942,8 @@ const SiteSettings: React.FC<{ version: ProjectVersion; onUpdate: () => void }> 
                             />
                         </div>
                         {sys.sections.map(sec => (
-                            <div key={sec.id} className="ml-12 bg-slate-50 border border-slate-200 rounded-[2rem] p-8 shadow-inner">
-                                <h5 className="font-bold text-slate-600 uppercase text-xs mb-6 tracking-widest">Section: {sec.name}</h5>
+                            <div key={sec.id} className="ml-2 sm:ml-6 md:ml-10 bg-slate-50 border border-slate-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-inner">
+                                <h5 className="font-bold text-slate-700 uppercase text-xs mb-5 tracking-wider">Section: {sec.name}</h5>
                                 <SiteWorkInputs
                                     data={sec}
                                     onSave={(fields) => updateSectionFields(sec.id, fields)}
@@ -1652,7 +1961,7 @@ const SiteSettings: React.FC<{ version: ProjectVersion; onUpdate: () => void }> 
 
 const SiteWorkInputs: React.FC<{
     data: any;
-    onSave: (fields: any) => void;
+    onSave: (fields: any) => Promise<void> | void;
     ioCount: number;
     cablingRate: number
 }> = ({ data, onSave, ioCount, cablingRate }) => {
@@ -1671,6 +1980,8 @@ const SiteWorkInputs: React.FC<{
         return state;
     });
 
+    const [isSaved, setIsSaved] = useState(false);
+
     const updateField = (key: string, part: 'rate' | 'qty', val: number) => {
         setDetails((prev: any) => ({
             ...prev,
@@ -1678,21 +1989,23 @@ const SiteWorkInputs: React.FC<{
         }));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const payload: any = { siteWorkDetails: details };
         // Flatten totals for legacy compatibility and main logic
         Object.keys(details).forEach(key => {
             payload[key] = details[key].rate * details[key].qty;
         });
-        onSave(payload);
+        await onSave(payload);
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2500);
     };
 
     const siteSubtotal = Object.values(details).reduce((acc: number, f: any) => acc + (f.rate * f.qty), 0);
     const cablingCost = ioCount * cablingRate;
 
     return (
-        <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                 {[
                     { label: 'Mandays', key: 'mandays' },
                     { label: 'Mobilization', key: 'mobilization' },
@@ -1704,17 +2017,17 @@ const SiteWorkInputs: React.FC<{
                     const total = field.rate * field.qty;
 
                     return (
-                        <div key={f.key} className="p-5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-blue-200 transition-colors">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">{f.label}</label>
+                        <div key={f.key} className="p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-blue-200 transition-colors">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">{f.label}</label>
 
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 <div>
                                     <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Unit Rate (RM)</div>
                                     <input
                                         type="number"
                                         value={field.rate}
                                         onChange={e => updateField(f.key, 'rate', Number(e.target.value))}
-                                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-sm font-black text-slate-900 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-black text-slate-900 focus:bg-white focus:border-blue-500 outline-none transition-all"
                                     />
                                 </div>
 
@@ -1724,13 +2037,13 @@ const SiteWorkInputs: React.FC<{
                                         type="number"
                                         value={field.qty}
                                         onChange={e => updateField(f.key, 'qty', Number(e.target.value))}
-                                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-sm font-black text-slate-900 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-black text-slate-900 focus:bg-white focus:border-blue-500 outline-none transition-all"
                                     />
                                 </div>
 
-                                <div className="pt-2 border-t border-slate-50 flex justify-between items-center">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Subtotal</span>
-                                    <span className="text-[11px] font-black text-slate-900">RM{total.toLocaleString()}</span>
+                                <div className="pt-2 border-t border-slate-50 flex justify-between items-center text-[10px]">
+                                    <span className="font-bold text-slate-400 uppercase text-[8px]">Subtotal</span>
+                                    <span className="font-black text-slate-900">RM{total.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -1738,24 +2051,36 @@ const SiteWorkInputs: React.FC<{
                 })}
             </div>
 
-            <div className="flex justify-between items-center p-6 bg-slate-900 rounded-[2rem] text-white shadow-xl">
-                <div className="flex gap-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 sm:p-6 bg-slate-900 rounded-2xl text-white shadow-xl">
+                <div className="flex flex-wrap items-center gap-6 sm:gap-10">
                     <div>
-                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Subtotal Site Work</div>
-                        <div className="text-xl font-black">RM{siteSubtotal.toLocaleString()}</div>
+                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Subtotal Site Work</div>
+                        <div className="text-lg sm:text-xl font-black">RM{siteSubtotal.toLocaleString()}</div>
                     </div>
-                    <div className="border-l border-white/10 pl-10">
-                        <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Cabling ({ioCount} IO)</div>
-                        <div className="text-xl font-black text-blue-100">RM{cablingCost.toLocaleString()}</div>
+                    <div className="border-l border-white/10 pl-6 sm:pl-10">
+                        <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Cabling ({ioCount} IO)</div>
+                        <div className="text-lg sm:text-xl font-black text-blue-100">RM{cablingCost.toLocaleString()}</div>
                     </div>
                 </div>
 
                 <button
                     onClick={handleSave}
-                    className="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center gap-3"
+                    className={cn(
+                        "w-full sm:w-auto px-6 sm:px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2",
+                        isSaved ? "bg-emerald-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white"
+                    )}
                 >
-                    <Save size={14} />
-                    Save Changes
+                    {isSaved ? (
+                        <>
+                            <Check size={14} className="text-white" />
+                            Saved!
+                        </>
+                    ) : (
+                        <>
+                            <Save size={14} />
+                            Save Changes
+                        </>
+                    )}
                 </button>
             </div>
         </div>

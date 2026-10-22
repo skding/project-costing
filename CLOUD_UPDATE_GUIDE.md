@@ -1,68 +1,96 @@
-# Cloud Update Guide - Hardware Packages Feature
+# Cloud Update Guide - v1.0.0 Release (Clover Digital Branding & UI Enhancements)
 
-This guide explains how to update your Project Costing application on the Oracle Cloud instance to include the new **Hardware Packages** feature.
+This guide provides step-by-step instructions for deploying the latest updates to your Oracle Cloud instance.
+
+---
+
+### What's New in v1.0.0
+1. **Clover Digital Sdn Bhd Branding & Logo**: Integrated company credentials (Address: 7A Jalan PP 2/1 47100 Puchong Selangor, BRN: 201501034912, Web, Email) across login, navigation, and exports.
+2. **Version Reset**: Standardized application versioning to `v1.0.0`.
+3. **Compact Modern Dashboard**: Reduced project card sizes and optimized grid to display more items per row.
+4. **Total System I/O Aggregation**: Displays aggregate I/O metrics (DI, DO, AI, AO, RTD, HLI, and Total I/O) summed across all sections in the BOM System header.
+5. **Independent Catalog Scrolling**: The Components & Packages side panel scrolls independently from the BOM list and remains sticky on the screen.
+6. **In-Place Component Quantity Updates**: Material quantities increment/decrement without rearranging rows to the bottom.
+7. **In-Place Section Preservation**: Sections in Services & Rates remain in place upon saving changes.
+8. **Export Project to Markdown (.md)**: One-click export button generating a comprehensive engineering and pricing document.
+9. **Mobile & Tablet Responsive**: Responsive hamburger menu drawer, touch-friendly scrolling tabs, and responsive form views.
+
+---
 
 ## 1. Pull Latest Changes
-Navigate to your project root and pull the latest code from Git:
+Navigate to the project root on your Oracle Cloud server and pull the latest code:
 ```bash
 cd /var/www/project-costing
 git pull origin main
 ```
 
+---
+
 ## 2. Update Backend (Server)
-The backend requires a database migration and a rebuild.
-
-1.  **Navigate to the server directory**:
-    ```bash
-    cd server
-    ```
-2.  **Install any new dependencies** (if applicable):
-    ```bash
-    npm install
-    ```
-3.  **Run Database Migrations & Generate Client**:
-    This step is CRITICAL to add the new `HardwarePackage` and `HardwarePackageItem` tables to your production database and update the Prisma Client types.
-    ```bash
-    npx prisma migrate deploy
-    npx prisma generate
-    ```
-4.  **Rebuild the Backend**:
-    ```bash
-    npm run build
-    ```
-5.  **Restart the API with PM2**:
-    ```bash
-    pm2 restart costing-api
-    ```
-
-## 3. Update Frontend (Client)
-The frontend needs to be rebuilt to include the new UI components.
-
-1.  **Navigate to the client directory**:
-    ```bash
-    cd ../client
-    ```
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-3.  **Rebuild the Frontend**:
-    Ensure you use your cloud instance's IP address for the API URL.
-    ```bash
-    # Replace <YOUR_CLOUD_IP> with your instance IP
-    VITE_API_URL="http://<YOUR_CLOUD_IP>:3003/api" npm run build
-    ```
-4.  **Restart the Frontend with PM2**:
-    ```bash
-    pm2 restart costing-frontend
-    ```
-
-## 4. Verification
-Once updated, verify the following:
-1.  Navigate to **Component Library**; you should see a new "Hardware Packages" tab.
-2.  Navigate to a **Project -> BOM**; you should see the "Packages" tab in the right sidebar.
-3.  Try creating a test package and adding it to a project to ensure the database link is working.
+1. **Navigate to the server directory**:
+   ```bash
+   cd /var/www/project-costing/server
+   ```
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Generate Prisma Client & Check Migrations**:
+   ```bash
+   npx prisma generate
+   npx prisma migrate deploy
+   ```
+4. **Rebuild the Backend**:
+   ```bash
+   npm run build
+   ```
+5. **Restart the Server Service with PM2**:
+   ```bash
+   pm2 restart costing-api
+   ```
 
 ---
-**Troubleshooting Database Migrations:**
-If `npx prisma migrate deploy` fails, ensure your `DATABASE_URL` in the `.env` file is correct and the PostgreSQL service is running. If you encounter "relation already exists" errors, ensure you haven't manually created tables that Prisma is trying to manage.
+
+## 3. Update Frontend (Client)
+1. **Navigate to the client directory**:
+   ```bash
+   cd /var/www/project-costing/client
+   ```
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Rebuild the Production Bundle**:
+   Replace `<YOUR_CLOUD_IP>` with your instance's public IP (e.g. port 3002 or your production API port):
+   ```bash
+   VITE_API_URL="http://<YOUR_CLOUD_IP>:3002/api" npm run build
+   ```
+4. **Restart the Frontend Service with PM2** (or reload Nginx):
+   ```bash
+   pm2 restart costing-frontend
+   ```
+   *If serving static files via Nginx:*
+   ```bash
+   sudo systemctl reload nginx
+   ```
+
+---
+
+## 4. Verification Checklist
+- [ ] Log in with user credentials; verify the Clover Digital logo and `v1.0.0` in the header and login screen.
+- [ ] Check Dashboard project cards: verify compact layout showing 4–5 cards per row on wide screens.
+- [ ] Open a project and navigate to **Bill of Materials**:
+  - [ ] Verify System Header displays aggregate Total I/O badges.
+  - [ ] Verify the right Components/Packages catalog bar scrolls independently.
+  - [ ] Click `+` or `-` on item quantity: verify row stays in position.
+- [ ] Open **Services & Rates**:
+  - [ ] Edit a section and click **Save Changes**: verify section stays in position and shows "Saved!".
+- [ ] Click **Export MD** in the top action bar: verify the Markdown file downloads with company header, BOM table, and financial summary.
+- [ ] View on a mobile screen or resize browser window: verify hamburger menu opens drawer navigation and tabs scroll smoothly.
+
+---
+
+## 5. Troubleshooting
+- **API URL mismatch**: If the frontend cannot communicate with the backend, verify `VITE_API_URL` during `npm run build` matches your cloud public IP and firewall port (default: `3002`).
+- **PM2 process list**: Run `pm2 list` and `pm2 logs` to inspect any startup issues.
+- **Firewall**: Ensure ports `3002` (backend) and `5173` (or port `80`/`443` for Nginx) are permitted in Oracle Cloud Security Lists and `iptables` / `firewalld`.

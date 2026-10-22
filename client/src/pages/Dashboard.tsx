@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, FolderOpen, Calendar } from 'lucide-react';
+import { Plus, FolderOpen, Calendar, MapPin, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
@@ -95,36 +95,36 @@ const Dashboard: React.FC = () => {
     });
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-end">
+        <div className="space-y-6 sm:space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                 <div>
-                    <h2 className="text-4xl font-black text-slate-900 tracking-tight">Projects</h2>
-                    <p className="text-slate-500 mt-2 font-medium">Manage your system architecture and costings</p>
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Projects</h2>
+                    <p className="text-slate-500 mt-1 text-xs sm:text-sm font-medium">Manage system architectures, BOMs and cost estimation</p>
                 </div>
                 <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold transition-all shadow-lg shadow-blue-100 active:scale-95"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-500/20 active:scale-95"
                 >
-                    <Plus size={20} />
+                    <Plus size={16} />
                     New Project
                 </button>
             </div>
 
             {/* Search and Filters */}
-            <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm">
                 <div className="flex-1 relative">
                     <input
                         type="text"
-                        placeholder="Search projects or clients..."
+                        placeholder="Search projects, client, or location..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-4 pr-4 py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 font-medium"
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 font-medium text-xs sm:text-sm"
                     />
                 </div>
                 <select
                     value={selectedClientFilter}
                     onChange={(e) => setSelectedClientFilter(e.target.value)}
-                    className="bg-slate-50 border-none rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 font-bold min-w-[200px]"
+                    className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 font-bold text-xs sm:text-sm min-w-[180px]"
                 >
                     <option value="all">All Clients</option>
                     {clients.map(c => (
@@ -134,54 +134,60 @@ const Dashboard: React.FC = () => {
             </div>
 
             {isLoading ? (
-                <div className="text-center py-20 text-slate-400 font-bold animate-pulse">Loading workspace...</div>
+                <div className="text-center py-20 text-slate-400 font-bold text-xs uppercase tracking-widest animate-pulse">Loading workspace...</div>
             ) : filteredProjects.length === 0 ? (
-                <div className="text-center py-32 bg-white rounded-[2.5rem] border border-dashed border-slate-200 shadow-inner">
-                    <FolderOpen size={64} className="mx-auto text-slate-200 mb-6" />
-                    <h3 className="text-xl font-black text-slate-900">No matching projects</h3>
-                    <p className="text-slate-500 mt-2">Try adjusting your filters or create a new design.</p>
+                <div className="text-center py-20 sm:py-28 bg-white rounded-3xl border border-dashed border-slate-200 shadow-inner px-4">
+                    <FolderOpen size={48} className="mx-auto text-slate-300 mb-4" />
+                    <h3 className="text-lg font-black text-slate-900">No matching projects</h3>
+                    <p className="text-slate-500 text-xs mt-1">Try adjusting your filters or create a new project design.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                /* Compact professional cards grid: fits 4-5 items per row on wider screens */
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     {filteredProjects.map((project) => (
-                        <div key={project.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 p-8 flex flex-col group hover:-translate-y-1">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="p-4 bg-blue-50 text-blue-600 rounded-[1.5rem] group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                                    <FolderOpen size={28} />
+                        <div
+                            key={project.id}
+                            className="bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all duration-200 p-5 flex flex-col group hover:-translate-y-0.5 justify-between"
+                        >
+                            <div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200">
+                                        <FolderOpen size={20} />
+                                    </div>
+                                    <span className="text-[9px] font-black px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full uppercase tracking-wider border border-slate-200/50">
+                                        {project.versions[0] ? `Rev ${project.versions[0].versionNumber}` : 'Draft'}
+                                    </span>
                                 </div>
-                                <span className="text-[10px] font-black px-4 py-1.5 bg-slate-100 text-slate-500 rounded-full uppercase tracking-widest">
-                                    {project.versions[0] ? `Rev ${project.versions[0].versionNumber}` : 'Draft'}
-                                </span>
+
+                                <h3 className="text-base font-black text-slate-900 mb-2 truncate group-hover:text-blue-600 transition-colors" title={project.name}>
+                                    {project.name}
+                                </h3>
+
+                                <div className="flex flex-col gap-1.5 mb-5 text-[11px]">
+                                    <div className="flex items-center gap-1.5 text-slate-500 font-bold">
+                                        <Building2 size={13} className="text-slate-400 shrink-0" />
+                                        <span className="truncate">{project.client?.name || 'Standard Client'}</span>
+                                    </div>
+                                    {project.location && (
+                                        <div className="flex items-center gap-1.5 text-slate-400 font-medium text-[10px]">
+                                            <MapPin size={12} className="text-blue-500 shrink-0" />
+                                            <span className="truncate">{project.location}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <h3 className="text-2xl font-black text-slate-900 mb-2 truncate">{project.name}</h3>
-                            <div className="flex flex-col gap-2 mb-8">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{project.client?.name || 'Standard Assets'}</p>
-                                </div>
-                                {project.location && (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{project.location}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Modified</span>
-                                    <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
-                                        <Calendar size={14} className="text-slate-400" />
-                                        <span>{new Date(project.updatedAt).toLocaleDateString()}</span>
-                                    </div>
+                            <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
+                                <div className="flex items-center gap-1 text-slate-400 font-medium text-[10px]">
+                                    <Calendar size={12} className="text-slate-400" />
+                                    <span>{new Date(project.updatedAt).toLocaleDateString()}</span>
                                 </div>
                                 {project.versions[0] && (
                                     <Link
                                         to={`/projects/${project.id}/versions/${project.versions[0].id}`}
-                                        className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-colors shadow-lg"
+                                        className="bg-slate-900 text-white px-3.5 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider hover:bg-blue-600 transition-colors shadow-sm"
                                     >
-                                        Open Details
+                                        Open
                                     </Link>
                                 )}
                             </div>
@@ -190,58 +196,59 @@ const Dashboard: React.FC = () => {
                 </div>
             )}
 
-            {/* Simple Create Modal Overlay */}
+            {/* Create Project Modal */}
             {isCreateModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 animate-in zoom-in-95 duration-200">
-                        <h3 className="text-3xl font-black text-slate-900 mb-8 tracking-tight">Create Project</h3>
-                        <form onSubmit={handleCreateProject} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Project Identifier</label>
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-in zoom-in-95 duration-200 border border-slate-100">
+                        <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-6 tracking-tight">Create Project</h3>
+                        <form onSubmit={handleCreateProject} className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Project Identifier</label>
                                 <input
                                     autoFocus
                                     type="text"
                                     placeholder="e.g. JB Water Treatment Plant"
                                     value={newProjectName}
                                     onChange={(e) => setNewProjectName(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-5 py-4 outline-none font-bold text-slate-900 transition-all"
+                                    className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl px-4 py-3 outline-none font-bold text-slate-900 transition-all text-sm"
+                                    required
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Location</label>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Location</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. Johor Bahru, Malaysia"
+                                    placeholder="e.g. Puchong, Selangor"
                                     value={newProjectLocation}
                                     onChange={(e) => setNewProjectLocation(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-5 py-4 outline-none font-bold text-slate-900 transition-all"
+                                    className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl px-4 py-3 outline-none font-bold text-slate-900 transition-all text-sm"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Assign Client</label>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Assign Client</label>
                                 <select
                                     value={newProjectClientId}
                                     onChange={(e) => setNewProjectClientId(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-5 py-4 outline-none font-bold text-slate-900 transition-all appearance-none"
+                                    className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl px-4 py-3 outline-none font-bold text-slate-900 transition-all text-sm"
                                 >
                                     <option value="">Select a Client</option>
                                     {clients.map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
-                                    <option value="new" className="text-blue-600">+ Create New Client</option>
+                                    <option value="new" className="text-blue-600 font-bold">+ Create New Client</option>
                                 </select>
                             </div>
-                            <div className="flex gap-4 pt-6">
+                            <div className="flex gap-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsCreateModalOpen(false)}
-                                    className="flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-colors"
+                                    className="flex-1 px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                                    className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20"
                                 >
                                     Begin Design
                                 </button>
