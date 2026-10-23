@@ -258,8 +258,8 @@ const ComponentLibrary: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-900">Component Library</h2>
-                    <p className="text-slate-500 mt-1">Manage global hardware catalog, pricing, and packages</p>
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Component Library</h2>
+                    <p className="text-slate-600 mt-1 font-medium">Manage global hardware catalog, pricing, and packages</p>
                 </div>
                 {activeTab === 'components' ? (
                     <button
@@ -296,18 +296,18 @@ const ComponentLibrary: React.FC = () => {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
+            <div className="flex gap-2 p-1.5 bg-slate-200/90 rounded-2xl w-fit border border-slate-300/60 shadow-sm">
                 <button
                     onClick={() => setActiveTab('components')}
-                    className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all",
-                        activeTab === 'components' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                    className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                        activeTab === 'components' ? "bg-white text-blue-700 shadow font-black" : "text-slate-700 hover:text-slate-950 hover:bg-slate-300/50")}
                 >
                     Hardware Components
                 </button>
                 <button
                     onClick={() => setActiveTab('packages')}
-                    className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all",
-                        activeTab === 'packages' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                    className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                        activeTab === 'packages' ? "bg-white text-blue-700 shadow font-black" : "text-slate-700 hover:text-slate-950 hover:bg-slate-300/50")}
                 >
                     Hardware Packages
                 </button>
@@ -315,22 +315,22 @@ const ComponentLibrary: React.FC = () => {
 
             {activeTab === 'components' && (
                 <>
-                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-2xl border shadow-sm">
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                         <div className="relative flex-1 w-full">
                             <input
                                 type="text"
                                 placeholder="Search by model, brand, or description..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-4 pr-10 py-2.5 border border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50/50"
+                                className="w-full pl-4 pr-10 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50 text-slate-900 font-bold placeholder-slate-400"
                             />
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Filter:</span>
+                            <span className="text-xs font-black text-slate-700 uppercase tracking-wider ml-2">Filter:</span>
                             <select
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-widest focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
+                                className="border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-wider focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 text-slate-800 cursor-pointer"
                             >
                                 <option value="All">All Categories</option>
                                 {availableCategories.map(cat => (
@@ -338,43 +338,43 @@ const ComponentLibrary: React.FC = () => {
                                 ))}
                             </select>
                         </div>
-                        <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2.5 rounded-xl uppercase tracking-widest">
+                        <div className="text-xs font-black text-slate-700 bg-slate-100 border border-slate-200 px-4 py-2.5 rounded-xl uppercase tracking-wider">
                             {filteredComponents.length} Items Found
                         </div>
                     </div>
 
                     {isAdding && (
-                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-blue-100 shadow-xl animate-in fade-in zoom-in-95 duration-300">
-                            <h3 className="text-xl font-black mb-6 uppercase tracking-tight">{editingId ? 'Edit Hardware Component' : 'New Hardware Component'}</h3>
+                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-200 shadow-xl animate-in fade-in zoom-in-95 duration-300">
+                            <h3 className="text-2xl font-black mb-6 uppercase tracking-tight text-slate-900">{editingId ? 'Edit Hardware Component' : 'New Hardware Component'}</h3>
                             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Model Number</label>
-                                    <input required value={newComp.model} onChange={e => setNewComp({ ...newComp, model: e.target.value })} className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold" />
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">Model Number</label>
+                                    <input required value={newComp.model} onChange={e => setNewComp({ ...newComp, model: e.target.value })} className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-bold text-slate-900" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Brand</label>
-                                    <input required value={newComp.brand} onChange={e => setNewComp({ ...newComp, brand: e.target.value })} className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold" />
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">Brand</label>
+                                    <input required value={newComp.brand} onChange={e => setNewComp({ ...newComp, brand: e.target.value })} className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-bold text-slate-900" />
                                 </div>
                                 <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Description</label>
-                                    <input required value={newComp.description} onChange={e => setNewComp({ ...newComp, description: e.target.value })} className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold" />
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">Description</label>
+                                    <input required value={newComp.description} onChange={e => setNewComp({ ...newComp, description: e.target.value })} className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-bold text-slate-900" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Category</label>
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">Category</label>
                                     <div className="flex gap-3">
                                         {!isAddingNewCategory ? (
                                             <>
                                                 <select
                                                     value={newComp.category}
                                                     onChange={e => setNewComp({ ...newComp, category: e.target.value })}
-                                                    className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 font-bold outline-none"
+                                                    className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                                 >
                                                     {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
                                                 </select>
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsAddingNewCategory(true)}
-                                                    className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                                                    className="px-4 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition-colors"
                                                 >
                                                     + New
                                                 </button>
@@ -386,12 +386,12 @@ const ComponentLibrary: React.FC = () => {
                                                     placeholder="Enter category name..."
                                                     value={newCategoryName}
                                                     onChange={e => setNewCategoryName(e.target.value)}
-                                                    className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 font-bold"
+                                                    className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 font-bold text-slate-900"
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={() => { setIsAddingNewCategory(false); setNewCategoryName(''); }}
-                                                    className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                                                    className="px-4 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition-colors"
                                                 >
                                                     Cancel
                                                 </button>
@@ -400,22 +400,22 @@ const ComponentLibrary: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">List Price (RM)</label>
-                                    <input type="number" step="0.01" required value={newComp.listPrice} onChange={e => setNewComp({ ...newComp, listPrice: parseFloat(e.target.value) })} className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 font-bold" />
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">List Price (RM)</label>
+                                    <input type="number" step="0.01" required value={newComp.listPrice} onChange={e => setNewComp({ ...newComp, listPrice: parseFloat(e.target.value) })} className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
                                 </div>
 
                                 {newComp.category === 'PLC' && (
-                                    <div className="md:col-span-2 border-t border-slate-100 pt-6 mt-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 block">Hardware IO Specifications</label>
+                                    <div className="md:col-span-2 border-t border-slate-200 pt-6 mt-2">
+                                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 mb-4 block">Hardware IO Specifications</label>
                                         <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
                                             {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(io => (
                                                 <div key={io}>
-                                                    <label className="text-[9px] font-black uppercase tracking-widest block mb-2 text-slate-500 text-center">{io}</label>
+                                                    <label className="text-[10px] font-black uppercase tracking-wider block mb-2 text-slate-700 text-center">{io}</label>
                                                     <input
                                                         type="number"
                                                         value={(newComp.ioSpecs as any)[io]}
                                                         onChange={e => setNewComp({ ...newComp, ioSpecs: { ...newComp.ioSpecs, [io]: parseInt(e.target.value) || 0 } })}
-                                                        className="w-full border-slate-100 bg-slate-50/50 rounded-lg px-2 py-2 text-xs text-center font-bold"
+                                                        className="w-full border border-slate-300 bg-slate-50/60 rounded-lg px-2 py-2 text-xs text-center font-black text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
                                                     />
                                                 </div>
                                             ))}
@@ -424,9 +424,9 @@ const ComponentLibrary: React.FC = () => {
                                 )}
 
                                 {/* Automatic Quantity Calculation based on IO Factors */}
-                                <div className="md:col-span-2 border-t border-slate-100 pt-6 mt-2">
+                                <div className="md:col-span-2 border-t border-slate-200 pt-6 mt-2">
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2 cursor-pointer select-none">
+                                        <label className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2 cursor-pointer select-none">
                                             <input
                                                 type="checkbox"
                                                 checked={Boolean((newComp.ioSpecs as any)?.isAutoCalc)}
@@ -447,16 +447,16 @@ const ComponentLibrary: React.FC = () => {
                                             <span>⚡ Automatic Quantity Calculation (I/O Factor Formula)</span>
                                         </label>
                                     </div>
-                                    <p className="text-[11px] text-slate-500 mb-3">
+                                    <p className="text-xs text-slate-600 mb-3 font-medium">
                                         When added to a BOM, initial quantity will be automatically computed: 
-                                        <span className="font-mono font-bold text-blue-600 ml-1">Total Qty = Σ (Factor × Respective I/O Quantity)</span>. The user can adjust the value anytime.
+                                        <span className="font-mono font-bold text-blue-700 ml-1">Total Qty = Σ (Factor × Respective I/O Quantity)</span>. The user can adjust the value anytime.
                                     </p>
 
                                     {(newComp.ioSpecs as any)?.isAutoCalc && (
-                                        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 space-y-3">
+                                        <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-3">
                                             {/* Presets */}
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Presets:</span>
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Presets:</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -469,7 +469,7 @@ const ComponentLibrary: React.FC = () => {
                                                             }
                                                         });
                                                     }}
-                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                    className="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 hover:border-blue-500 hover:text-blue-700 transition-all shadow-sm"
                                                 >
                                                     Relays (1×DO)
                                                 </button>
@@ -485,7 +485,7 @@ const ComponentLibrary: React.FC = () => {
                                                             }
                                                         });
                                                     }}
-                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                    className="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 hover:border-blue-500 hover:text-blue-700 transition-all shadow-sm"
                                                 >
                                                     Isolators (1×AI)
                                                 </button>
@@ -497,11 +497,11 @@ const ComponentLibrary: React.FC = () => {
                                                             ioSpecs: {
                                                                 ...newComp.ioSpecs,
                                                                 isAutoCalc: true,
-                                                                ioFactors: { DI: 2, DO: 2, AI: 3, AO: 2, RTD: 3, HLI: 0 }
+                                                                ioFactors: { DI: 2, DO: 2, AI: 3, AO: 3, RTD: 3, HLI: 0 }
                                                             }
                                                         });
                                                     }}
-                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                    className="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 hover:border-blue-500 hover:text-blue-700 transition-all shadow-sm"
                                                 >
                                                     Terminals (2×Digital, 3×Analog)
                                                 </button>
@@ -517,7 +517,7 @@ const ComponentLibrary: React.FC = () => {
                                                             }
                                                         });
                                                     }}
-                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                    className="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 hover:border-blue-500 hover:text-blue-700 transition-all shadow-sm"
                                                 >
                                                     1× Each I/O
                                                 </button>
@@ -533,7 +533,7 @@ const ComponentLibrary: React.FC = () => {
                                                             }
                                                         });
                                                     }}
-                                                    className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-400 hover:text-red-500 transition-all"
+                                                    className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-500 hover:text-red-600 transition-all"
                                                 >
                                                     Clear
                                                 </button>
@@ -542,8 +542,8 @@ const ComponentLibrary: React.FC = () => {
                                             {/* 6 Factor Inputs */}
                                             <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                                                 {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(io => (
-                                                    <div key={io} className="bg-white p-2.5 rounded-xl border border-blue-100 shadow-sm">
-                                                        <label className="text-[9px] font-black uppercase tracking-wider block mb-1 text-slate-600 text-center">
+                                                    <div key={io} className="bg-white p-2.5 rounded-xl border border-blue-200 shadow-sm">
+                                                        <label className="text-[10px] font-black uppercase tracking-wider block mb-1 text-slate-800 text-center">
                                                             {io} Factor
                                                         </label>
                                                         <input
@@ -566,7 +566,7 @@ const ComponentLibrary: React.FC = () => {
                                                                     }
                                                                 });
                                                             }}
-                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center font-black text-slate-800 outline-none focus:border-blue-500"
+                                                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-center font-black text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
                                                         />
                                                     </div>
                                                 ))}
@@ -576,8 +576,8 @@ const ComponentLibrary: React.FC = () => {
                                 </div>
 
                                 <div className="md:col-span-2 flex justify-end gap-3 mt-6">
-                                    <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancel</button>
-                                    <button type="submit" className="px-10 py-3 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-blue-100">
+                                    <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3 text-slate-700 font-bold hover:bg-slate-100 rounded-xl transition-colors">Cancel</button>
+                                    <button type="submit" className="px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-blue-200 transition-all">
                                         {editingId ? 'Update Component' : 'Save Component'}
                                     </button>
                                 </div>
@@ -585,26 +585,26 @@ const ComponentLibrary: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Model</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Brand</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Price</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                <tr className="bg-slate-100/90 border-b border-slate-200">
+                                    <th className="px-8 py-5 text-xs font-black text-slate-700 uppercase tracking-wider">Model</th>
+                                    <th className="px-8 py-5 text-xs font-black text-slate-700 uppercase tracking-wider">Category</th>
+                                    <th className="px-8 py-5 text-xs font-black text-slate-700 uppercase tracking-wider">Brand</th>
+                                    <th className="px-8 py-5 text-xs font-black text-slate-700 uppercase tracking-wider">Price</th>
+                                    <th className="px-8 py-5 text-xs font-black text-slate-700 uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-100">
                                 {filteredComponents.map((comp) => (
-                                    <tr key={comp.id} className="hover:bg-slate-50/30 transition-colors group">
+                                    <tr key={comp.id} className="hover:bg-blue-50/20 transition-colors group">
                                         <td className="px-8 py-5">
-                                            <div className="font-black text-slate-900 uppercase tracking-tight">{comp.model}</div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{comp.description}</div>
+                                            <div className="font-black text-slate-900 uppercase tracking-tight text-sm">{comp.model}</div>
+                                            <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mt-0.5">{comp.description}</div>
                                             {comp.ioSpecs?.isAutoCalc && comp.ioSpecs?.ioFactors && (
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                    <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1">
+                                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-300 flex items-center gap-1">
                                                         <span>⚡ Auto-Calc:</span>
                                                         {Object.entries(comp.ioSpecs.ioFactors as Record<string, number>)
                                                             .filter(([_, factor]) => Number(factor) > 0)
@@ -615,26 +615,28 @@ const ComponentLibrary: React.FC = () => {
                                             )}
                                         </td>
                                         <td className="px-8 py-5">
-                                            <div className="flex items-center gap-3 text-xs font-black text-slate-600 uppercase tracking-widest">
-                                                <span className="p-2 bg-white border border-slate-100 rounded-xl shadow-sm group-hover:border-blue-100 transition-colors">
+                                            <div className="flex items-center gap-3 text-xs font-black text-slate-800 uppercase tracking-wider">
+                                                <span className="p-2 bg-slate-100 border border-slate-200 rounded-xl shadow-sm text-slate-700 group-hover:border-blue-300 transition-colors">
                                                     {getCategoryIcon(comp.category)}
                                                 </span>
                                                 {comp.category}
                                             </div>
                                         </td>
-                                        <td className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-widest">{comp.brand}</td>
+                                        <td className="px-8 py-5 text-xs font-bold text-slate-700 uppercase tracking-wider">{comp.brand}</td>
                                         <td className="px-8 py-5 text-sm font-black text-slate-900">RM{comp.listPrice.toLocaleString()}</td>
                                         <td className="px-8 py-5 text-right">
-                                            <div className="flex justify-end gap-3">
+                                            <div className="flex justify-end gap-2">
                                                 <button
                                                     onClick={() => handleEdit(comp)}
                                                     className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                    title="Edit Component"
                                                 >
                                                     <Edit2 size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => deleteComponent(comp.id)}
-                                                    className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                    className="p-2.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                    title="Delete Component"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
@@ -644,7 +646,7 @@ const ComponentLibrary: React.FC = () => {
                                 ))}
                                 {filteredComponents.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-8 py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                                        <td colSpan={5} className="px-8 py-20 text-center text-slate-500 font-black uppercase text-xs tracking-wider">
                                             No components match your search...
                                         </td>
                                     </tr>
@@ -658,66 +660,66 @@ const ComponentLibrary: React.FC = () => {
             {activeTab === 'packages' && (
                 <>
                     {isAddingPkg && (
-                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-300">
+                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-300 shadow-xl animate-in fade-in zoom-in-95 duration-300">
                             <div className="flex justify-between items-center mb-8">
-                                <h3 className="text-xl font-black uppercase tracking-tight">{editingPkgId ? 'Edit Package' : 'Create New Hardware Package'}</h3>
-                                <button onClick={() => setIsAddingPkg(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><X size={24} /></button>
+                                <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900">{editingPkgId ? 'Edit Package' : 'Create New Hardware Package'}</h3>
+                                <button onClick={() => setIsAddingPkg(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><X size={24} /></button>
                             </div>
                             <form onSubmit={handlePkgSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Package Name</label>
-                                        <input required placeholder="e.g. CCR Standard Setup" value={newPkg.name} onChange={e => setNewPkg({ ...newPkg, name: e.target.value })} className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 transition-all font-bold" />
+                                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">Package Name</label>
+                                        <input required placeholder="e.g. CCR Standard Setup" value={newPkg.name} onChange={e => setNewPkg({ ...newPkg, name: e.target.value })} className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all font-bold text-slate-900" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Description</label>
-                                        <textarea value={newPkg.description} onChange={e => setNewPkg({ ...newPkg, description: e.target.value })} className="w-full border-slate-100 bg-slate-50/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 transition-all font-bold min-h-[100px]" />
+                                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 ml-1">Description</label>
+                                        <textarea value={newPkg.description} onChange={e => setNewPkg({ ...newPkg, description: e.target.value })} className="w-full border border-slate-300 bg-slate-50/60 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all font-bold text-slate-900 min-h-[100px]" />
                                     </div>
 
                                     <div className="space-y-4">
-                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-900">Package Contents ({newPkg.items.length})</h4>
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Package Contents ({newPkg.items.length})</h4>
                                         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                             {newPkg.items.map(item => (
-                                                <div key={item.catalogId} className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                                <div key={item.catalogId} className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
                                                     <div className="flex-1">
-                                                        <div className="text-[10px] font-black text-slate-900 uppercase">{item.catalog?.model}</div>
-                                                        <div className="text-[8px] font-bold text-slate-400 uppercase">{item.catalog?.brand}</div>
+                                                        <div className="text-xs font-black text-slate-900 uppercase">{item.catalog?.model}</div>
+                                                        <div className="text-[10px] font-bold text-slate-600 uppercase">{item.catalog?.brand}</div>
                                                     </div>
                                                     <div className="flex items-center gap-4">
-                                                        <div className="flex items-center gap-2 bg-white rounded-lg border p-1">
-                                                            <button type="button" onClick={() => updatePkgItemQty(item.catalogId, item.quantity - 1)} className="px-2 font-bold">-</button>
-                                                            <span className="w-6 text-center text-xs font-black">{item.quantity}</span>
-                                                            <button type="button" onClick={() => updatePkgItemQty(item.catalogId, item.quantity + 1)} className="px-2 font-bold">+</button>
+                                                        <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-300 p-1">
+                                                            <button type="button" onClick={() => updatePkgItemQty(item.catalogId, item.quantity - 1)} className="px-2 font-bold text-slate-700 hover:text-black">-</button>
+                                                            <span className="w-6 text-center text-xs font-black text-slate-900">{item.quantity}</span>
+                                                            <button type="button" onClick={() => updatePkgItemQty(item.catalogId, item.quantity + 1)} className="px-2 font-bold text-slate-700 hover:text-black">+</button>
                                                         </div>
                                                         <button type="button" onClick={() => removePkgItem(item.catalogId)} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={16} /></button>
                                                     </div>
                                                 </div>
                                             ))}
-                                            {newPkg.items.length === 0 && <div className="text-center py-10 text-[10px] font-black text-slate-300 uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-2xl">No items added yet</div>}
+                                            {newPkg.items.length === 0 && <div className="text-center py-10 text-xs font-black text-slate-500 uppercase tracking-wider border-2 border-dashed border-slate-200 rounded-2xl">No items added yet</div>}
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="space-y-6 flex flex-col h-full">
                                     <div className="relative">
-                                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                                         <input
                                             type="text"
                                             placeholder="Search components to add..."
                                             value={pkgSearchTerm}
                                             onChange={(e) => setPkgSearchTerm(e.target.value)}
-                                            className="w-full pl-12 pr-4 py-3 border-slate-100 bg-slate-50/50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                                            className="w-full pl-12 pr-4 py-3 border border-slate-300 bg-slate-50/60 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-bold text-slate-900 placeholder-slate-400"
                                         />
                                     </div>
                                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2">
                                         {components.filter(c => c.model.toLowerCase().includes(pkgSearchTerm.toLowerCase()) || c.brand.toLowerCase().includes(pkgSearchTerm.toLowerCase())).map(comp => (
-                                            <div key={comp.id} className="p-4 border border-slate-50 rounded-2xl hover:border-blue-200 hover:bg-blue-50/20 transition-all group cursor-pointer" onClick={() => addPkgItem(comp)}>
+                                            <div key={comp.id} className="p-4 border border-slate-200 rounded-2xl hover:border-blue-300 hover:bg-blue-50/20 transition-all group cursor-pointer bg-white" onClick={() => addPkgItem(comp)}>
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <div className="text-[10px] font-black text-slate-900 uppercase group-hover:text-blue-600">{comp.model}</div>
-                                                        <div className="text-[8px] font-bold text-slate-400 uppercase">{comp.brand} • {comp.category}</div>
+                                                        <div className="text-xs font-black text-slate-900 uppercase group-hover:text-blue-700">{comp.model}</div>
+                                                        <div className="text-[10px] font-bold text-slate-600 uppercase">{comp.brand} • {comp.category}</div>
                                                     </div>
-                                                    <Plus size={16} className="text-slate-300 group-hover:text-blue-600" />
+                                                    <Plus size={16} className="text-slate-400 group-hover:text-blue-600" />
                                                 </div>
                                             </div>
                                         ))}
@@ -732,33 +734,33 @@ const ComponentLibrary: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredPackages.map(pkg => (
-                            <div key={pkg.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all group flex flex-col h-full">
+                            <div key={pkg.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-lg transition-all group flex flex-col h-full">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 bg-slate-900 rounded-2xl text-white shadow-lg shadow-slate-200">
                                         <Package size={24} />
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => handleEditPkg(pkg)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 size={18} /></button>
-                                        <button onClick={() => deletePackage(pkg.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
+                                        <button onClick={() => handleEditPkg(pkg)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 size={18} /></button>
+                                        <button onClick={() => deletePackage(pkg.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
                                     </div>
                                 </div>
                                 <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">{pkg.name}</h4>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6 flex-1">{pkg.description || 'No description provided.'}</p>
+                                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-6 flex-1">{pkg.description || 'No description provided.'}</p>
                                 
-                                <div className="space-y-2 pt-4 border-t border-slate-50">
-                                    <div className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-3">Package Contents</div>
+                                <div className="space-y-2 pt-4 border-t border-slate-100">
+                                    <div className="text-xs font-black text-slate-800 uppercase tracking-wider mb-3">Package Contents</div>
                                     {pkg.items.slice(0, 3).map(item => (
-                                        <div key={item.id} className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <div key={item.id} className="flex justify-between text-xs font-bold text-slate-700 uppercase">
                                             <span>{item.catalog?.model}</span>
                                             <span>x{item.quantity}</span>
                                         </div>
                                     ))}
-                                    {pkg.items.length > 3 && <div className="text-[9px] font-black text-blue-600 uppercase mt-2">+{pkg.items.length - 3} More Items</div>}
+                                    {pkg.items.length > 3 && <div className="text-xs font-black text-blue-600 uppercase mt-2">+{pkg.items.length - 3} More Items</div>}
                                 </div>
                             </div>
                         ))}
                         {filteredPackages.length === 0 && (
-                            <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest border-2 border-dashed border-slate-100 rounded-[2.5rem]">
+                            <div className="col-span-full py-20 text-center text-slate-500 font-black uppercase text-xs tracking-wider border-2 border-dashed border-slate-200 rounded-[2.5rem]">
                                 No hardware packages found...
                             </div>
                         )}
