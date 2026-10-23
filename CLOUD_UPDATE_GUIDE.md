@@ -14,6 +14,8 @@ This guide provides step-by-step instructions for deploying the latest updates t
 7. **In-Place Section Preservation**: Sections in Services & Rates remain in place upon saving changes.
 8. **Export Project to Markdown (.md)**: One-click export button generating a comprehensive engineering and pricing document.
 9. **Mobile & Tablet Responsive**: Responsive hamburger menu drawer, touch-friendly scrolling tabs, and responsive form views.
+10. **Dual Detached BOM Scrolling**: Center BOM hierarchy and right-hand catalog each feature their own dedicated vertical scrollbars, operating completely detached from one another.
+11. **Multi-Column Compact BOM Cards**: Component items in BOM are arranged in a 2-to-3 column grid per section/system, drastically reducing vertical page height while keeping 1 item per row in the catalog.
 
 ---
 

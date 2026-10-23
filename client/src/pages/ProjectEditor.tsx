@@ -1445,11 +1445,11 @@ const AdvancedBOM: React.FC<{
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-                {/* Left: Architecture & Hierarchy */}
-                <div className={cn("lg:col-span-3 space-y-6", mobileTab === 'catalog' && "hidden lg:block")}>
-                    <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
-                        <div className="p-4 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start lg:h-[calc(100vh-15rem)]">
+                {/* Left/Center: Architecture & Hierarchy with independent vertical scroll (detached) */}
+                <div className={cn("lg:col-span-3 h-full flex flex-col min-h-0", mobileTab === 'catalog' && "hidden lg:flex")}>
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+                        <div className="shrink-0 p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/95">
                             <div>
                                 <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">Structured Bill of Materials</h3>
                                 <p className="text-slate-400 text-xs font-medium">Select a target level below to add items from the catalog</p>
@@ -1468,8 +1468,9 @@ const AdvancedBOM: React.FC<{
                             </div>
                         </div>
 
-                        <div className="p-4 sm:p-6 space-y-6">
-                            {/* Project Level Hardware - Collapsible (Item 2) */}
+                        {/* Scrollable Center Hierarchy with independent vertical scrollbar */}
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar min-h-0">
+                            {/* Project Level Hardware - Collapsible */}
                             <div className={cn("p-4 sm:p-5 rounded-2xl border transition-all",
                                 activeTarget?.type === 'project'
                                     ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40"
@@ -1484,7 +1485,7 @@ const AdvancedBOM: React.FC<{
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <h4 className="font-bold text-white uppercase tracking-tight text-sm sm:text-base">Project Level Hardware</h4>
+                                                <h4 className="font-bold text-white uppercase tracking-tight text-sm sm:base">Project Level Hardware</h4>
                                                 <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-800 text-slate-300 rounded-full border border-slate-700/60">
                                                     {projectLevelComps.length} items • RM{projectLevelCost.toLocaleString()}
                                                 </span>
@@ -1512,12 +1513,13 @@ const AdvancedBOM: React.FC<{
                                     </div>
                                 </div>
                                 {!isProjectLevelCollapsed && (
-                                    <div className="mt-4 pt-4 border-t border-slate-800/80">
+                                    <div className="mt-3 pt-3 border-t border-slate-800/80">
                                         <ComponentsList
                                             components={projectLevelComps}
                                             onRemove={removeComponent}
                                             onUpdateQty={updateComponentQty}
                                             onUpdateItem={updateComponentItem}
+                                            columns="grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
                                         />
                                     </div>
                                 )}
@@ -1542,7 +1544,7 @@ const AdvancedBOM: React.FC<{
                                 }, { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0, total: 0 });
 
                                 return (
-                                    <div key={sys.id} className="space-y-4">
+                                    <div key={sys.id} className="space-y-3">
                                         <div className={cn("p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer",
                                             activeTarget?.type === 'system' && activeTarget.id === sys.id
                                                 ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40"
@@ -1575,7 +1577,7 @@ const AdvancedBOM: React.FC<{
                                                 </div>
                                             </div>
 
-                                            {/* Total IO Summary at System Area (Item 4) */}
+                                            {/* Total IO Summary at System Area */}
                                             <div className="flex flex-wrap items-center gap-2 pt-2.5 mt-2 border-t border-slate-800/80">
                                                 <div className="px-2.5 py-1 bg-blue-950/60 border border-blue-900/60 rounded-lg flex items-center gap-1.5">
                                                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-300">Total System I/O:</span>
@@ -1592,126 +1594,134 @@ const AdvancedBOM: React.FC<{
                                             </div>
 
                                             {!collapsed.has(sys.id) && (
-                                                <div className="mt-4 pt-3 border-t border-slate-800/60">
+                                                <div className="mt-3 pt-3 border-t border-slate-800/60">
                                                     <ComponentsList
                                                         components={version.components.filter(c => c.systemId === sys.id && !c.sectionId)}
                                                         onRemove={removeComponent}
                                                         onUpdateQty={updateComponentQty}
                                                         onUpdateItem={updateComponentItem}
+                                                        columns="grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
                                                     />
                                                 </div>
                                             )}
                                         </div>
 
-                                        {!collapsed.has(sys.id) && sys.sections.map(sec => {
-                                            const requiredIO = sec.ioRequirements.reduce((acc, curr) => ({ ...acc, [curr.ioType]: (acc[curr.ioType] || 0) + curr.quantity }), {} as any);
+                                        {!collapsed.has(sys.id) && (
+                                            <div className={cn("ml-2 sm:ml-4", sys.sections.length > 1 ? "grid grid-cols-1 xl:grid-cols-2 gap-3" : "space-y-3")}>
+                                                {sys.sections.map(sec => {
+                                                    const requiredIO = sec.ioRequirements.reduce((acc, curr) => ({ ...acc, [curr.ioType]: (acc[curr.ioType] || 0) + curr.quantity }), {} as any);
 
-                                            (sec.equipment || []).forEach(eq => {
-                                                const eqQty = Number(eq.quantity) || 1;
-                                                eq.io.forEach(io => {
-                                                    requiredIO[io.ioType] = (requiredIO[io.ioType] || 0) + (io.quantity * eqQty);
-                                                });
-                                            });
+                                                    (sec.equipment || []).forEach(eq => {
+                                                        const eqQty = Number(eq.quantity) || 1;
+                                                        eq.io.forEach(io => {
+                                                            requiredIO[io.ioType] = (requiredIO[io.ioType] || 0) + (io.quantity * eqQty);
+                                                        });
+                                                    });
 
-                                            const providedIO = calculateProvidedIO(sec.id);
+                                                    const providedIO = calculateProvidedIO(sec.id);
 
-                                            return (
-                                                <div key={sec.id} className={cn("ml-2 sm:ml-6 lg:ml-8 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer bg-slate-900/90 relative overflow-hidden",
-                                                    activeTarget?.type === 'section' && activeTarget.id === sec.id
-                                                        ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40"
-                                                        : "border-slate-800 hover:border-slate-700")}
-                                                    onClick={() => setActiveTarget({ type: 'section', id: sec.id })}>
-                                                    <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div
-                                                                className="w-7 h-7 bg-blue-950/80 border border-blue-900/60 rounded-lg flex items-center justify-center text-blue-400 hover:text-white transition-colors shrink-0"
-                                                                onClick={(e) => { e.stopPropagation(); toggleCollapse(sec.id); }}
-                                                            >
-                                                                <ChevronDown size={14} className={cn("transition-transform duration-300", collapsed.has(sec.id) ? "-rotate-90" : "rotate-0")} />
-                                                            </div>
+                                                    return (
+                                                        <div key={sec.id} className={cn("p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer bg-slate-900/90 relative overflow-hidden flex flex-col justify-between",
+                                                            activeTarget?.type === 'section' && activeTarget.id === sec.id
+                                                                ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40"
+                                                                : "border-slate-800 hover:border-slate-700")}
+                                                            onClick={() => setActiveTarget({ type: 'section', id: sec.id })}>
                                                             <div>
-                                                                <h5 className="font-black text-white text-sm uppercase tracking-tight">{sec.name}</h5>
-                                                                <p className="text-[10px] font-bold text-slate-400">Assigned Hardware & IO Analysis</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setActiveTarget({ type: 'section', id: sec.id });
-                                                                    setMobileTab('catalog');
-                                                                }}
-                                                                className={cn("text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider transition-all",
-                                                                    activeTarget?.type === 'section' && activeTarget.id === sec.id
-                                                                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                                                                        : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white")}
-                                                            >
-                                                                {activeTarget?.type === 'section' && activeTarget.id === sec.id ? 'Selected' : '+ Add Item'}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {!collapsed.has(sec.id) && (
-                                                        <>
-                                                            {/* IO Comparison Table */}
-                                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-4">
-                                                                {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(type => {
-                                                                    const req = requiredIO[type] || 0;
-                                                                    const prov = providedIO[type] || 0;
-                                                                    const diff = prov - req;
-                                                                    const perc = req > 0 ? (prov / req) * 100 : 0;
-
-                                                                    const getStatusColor = () => {
-                                                                        if (perc < 100) return 'red';
-                                                                        if (perc < 130) return 'amber';
-                                                                        return 'emerald';
-                                                                    };
-                                                                    const color = getStatusColor();
-                                                                    const colorClasses = {
-                                                                        red: 'text-red-400 bg-red-950/60 border-red-900/60',
-                                                                        amber: 'text-amber-400 bg-amber-950/60 border-amber-900/60',
-                                                                        emerald: 'text-emerald-400 bg-emerald-950/60 border-emerald-900/60'
-                                                                    };
-
-                                                                    return (
-                                                                        <div key={type} className={cn("p-2.5 rounded-xl border transition-all",
-                                                                            req > 0 ? "bg-slate-950/90 border-slate-800" : "bg-slate-950/40 border-slate-800/40 opacity-40")}>
-                                                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{type}</div>
-                                                                            <div className="space-y-1">
-                                                                                <div className="flex justify-between text-[9px] font-bold">
-                                                                                    <span className="text-slate-400">Req: {req}</span>
-                                                                                    <span className={colorClasses[color].split(' ')[0]}>Prov: {prov}</span>
-                                                                                </div>
-                                                                                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                                                                                    <div
-                                                                                        className={cn("h-full transition-all",
-                                                                                            color === 'red' ? 'bg-red-500' : color === 'amber' ? 'bg-amber-500' : 'bg-emerald-500')}
-                                                                                        style={{ width: `${Math.min(perc, 100)}%` }}
-                                                                                    ></div>
-                                                                                </div>
-                                                                                <div className="flex justify-between items-center mt-1">
-                                                                                    <span className={cn("text-[8px] font-black px-1.5 py-0.5 rounded border", colorClasses[color])}>
-                                                                                        {diff >= 0 ? `+${diff}` : diff}
-                                                                                    </span>
-                                                                                    {req > 0 && <span className="text-[8px] font-medium text-slate-500">{perc.toFixed(0)}%</span>}
-                                                                                </div>
-                                                                            </div>
+                                                                <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-3">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <div
+                                                                            className="w-6 h-6 bg-blue-950/80 border border-blue-900/60 rounded-lg flex items-center justify-center text-blue-400 hover:text-white transition-colors shrink-0"
+                                                                            onClick={(e) => { e.stopPropagation(); toggleCollapse(sec.id); }}
+                                                                        >
+                                                                            <ChevronDown size={13} className={cn("transition-transform duration-300", collapsed.has(sec.id) ? "-rotate-90" : "rotate-0")} />
                                                                         </div>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                                        <div>
+                                                                            <h5 className="font-black text-white text-xs sm:text-sm uppercase tracking-tight">{sec.name}</h5>
+                                                                            <p className="text-[9px] font-bold text-slate-400">Assigned Hardware & IO Analysis</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setActiveTarget({ type: 'section', id: sec.id });
+                                                                                setMobileTab('catalog');
+                                                                            }}
+                                                                            className={cn("text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider transition-all",
+                                                                                activeTarget?.type === 'section' && activeTarget.id === sec.id
+                                                                                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                                                                                    : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white")}
+                                                                        >
+                                                                            {activeTarget?.type === 'section' && activeTarget.id === sec.id ? 'Selected' : '+ Add Item'}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
 
-                                                            <ComponentsList
-                                                                components={version.components.filter(c => c.sectionId === sec.id)}
-                                                                onRemove={removeComponent}
-                                                                onUpdateQty={updateComponentQty}
-                                                                onUpdateItem={updateComponentItem}
-                                                            />
-                                                        </>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
+                                                                {!collapsed.has(sec.id) && (
+                                                                    <>
+                                                                        {/* IO Comparison Table - Compact */}
+                                                                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-3">
+                                                                            {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(type => {
+                                                                                const req = requiredIO[type] || 0;
+                                                                                const prov = providedIO[type] || 0;
+                                                                                const diff = prov - req;
+                                                                                const perc = req > 0 ? (prov / req) * 100 : 0;
+
+                                                                                const getStatusColor = () => {
+                                                                                    if (perc < 100) return 'red';
+                                                                                    if (perc < 130) return 'amber';
+                                                                                    return 'emerald';
+                                                                                };
+                                                                                const color = getStatusColor();
+                                                                                const colorClasses = {
+                                                                                    red: 'text-red-400 bg-red-950/60 border-red-900/60',
+                                                                                    amber: 'text-amber-400 bg-amber-950/60 border-amber-900/60',
+                                                                                    emerald: 'text-emerald-400 bg-emerald-950/60 border-emerald-900/60'
+                                                                                };
+
+                                                                                return (
+                                                                                    <div key={type} className={cn("p-1.5 rounded-lg border transition-all",
+                                                                                        req > 0 ? "bg-slate-950/90 border-slate-800" : "bg-slate-950/40 border-slate-800/40 opacity-40")}>
+                                                                                        <div className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">{type}</div>
+                                                                                        <div className="space-y-0.5">
+                                                                                            <div className="flex justify-between text-[8px] font-bold">
+                                                                                                <span className="text-slate-500">R:{req}</span>
+                                                                                                <span className={colorClasses[color].split(' ')[0]}>P:{prov}</span>
+                                                                                            </div>
+                                                                                            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                                                                <div
+                                                                                                    className={cn("h-full transition-all",
+                                                                                                        color === 'red' ? 'bg-red-500' : color === 'amber' ? 'bg-amber-500' : 'bg-emerald-500')}
+                                                                                                    style={{ width: `${Math.min(perc, 100)}%` }}
+                                                                                                ></div>
+                                                                                            </div>
+                                                                                            <div className="flex justify-between items-center mt-0.5">
+                                                                                                <span className={cn("text-[7.5px] font-black px-1 py-0.2 rounded border", colorClasses[color])}>
+                                                                                                    {diff >= 0 ? `+${diff}` : diff}
+                                                                                                </span>
+                                                                                                {req > 0 && <span className="text-[7.5px] font-medium text-slate-500">{perc.toFixed(0)}%</span>}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+
+                                                                        <ComponentsList
+                                                                            components={version.components.filter(c => c.sectionId === sec.id)}
+                                                                            onRemove={removeComponent}
+                                                                            onUpdateQty={updateComponentQty}
+                                                                            onUpdateItem={updateComponentItem}
+                                                                            columns={sys.sections.length > 1 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"}
+                                                                        />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -1719,11 +1729,11 @@ const AdvancedBOM: React.FC<{
                     </div>
                 </div>
 
-                {/* Right: Catalog - Separate sticky container with independent scroll (Item 1, 3, 5, 7) */}
-                <div className={cn("lg:col-span-1 w-full", mobileTab === 'bom' && "hidden lg:block")}>
-                    <div className="lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-6rem)] flex flex-col bg-slate-900/95 border border-slate-800 rounded-3xl p-3.5 sm:p-4 shadow-xl">
-                        {/* Target Selection Dropdown (Item 7) */}
-                        <div className="shrink-0 space-y-2.5 mb-3 pb-3 border-b border-slate-800">
+                {/* Right: Catalog - Separate container with independent scroll & 1 item per row */}
+                <div className={cn("lg:col-span-1 h-full flex flex-col min-h-0", mobileTab === 'bom' && "hidden lg:flex")}>
+                    <div className="h-full flex flex-col min-h-0 bg-slate-900/95 border border-slate-800 rounded-2xl p-3 sm:p-3.5 shadow-xl overflow-hidden">
+                        {/* Target Selection Dropdown */}
+                        <div className="shrink-0 space-y-2 mb-2.5 pb-2.5 border-b border-slate-800">
                             <div className="flex items-center gap-1.5 p-2 bg-slate-950 border border-slate-800 rounded-xl">
                                 <span className="text-[9px] font-bold text-slate-400 uppercase shrink-0">Add To:</span>
                                 <select
@@ -1765,7 +1775,7 @@ const AdvancedBOM: React.FC<{
                             </div>
 
                             {catalogTab === 'components' && (
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <input
                                         type="text"
                                         placeholder="Search model, brand..."
@@ -1788,41 +1798,44 @@ const AdvancedBOM: React.FC<{
                             )}
                         </div>
 
-                        {/* Independently Scrollable Catalog List with 2-Column Compact Grid (Item 1, 3, 5, 7) */}
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-[300px] max-h-[60vh] lg:max-h-none">
+                        {/* Independently Scrollable Catalog List: 1 item per row (detached) */}
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-0">
                             {catalogTab === 'components' ? (
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-2">
                                     {filteredCatalog.map(item => (
                                         <div
                                             key={item.id}
-                                            className="p-2.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/60 rounded-xl group transition-all cursor-pointer flex flex-col justify-between"
+                                            className="p-2.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/60 rounded-xl group transition-all cursor-pointer flex items-center justify-between gap-2.5"
                                             onClick={() => addComponent(item.id)}
                                         >
-                                            <div>
-                                                <div className="flex justify-between items-start gap-1 mb-1">
-                                                    <span className="text-[7.5px] font-black uppercase text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-900/40 truncate max-w-[70px]">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <span className="text-[8px] font-black uppercase text-blue-400 bg-blue-950/70 border border-blue-900/40 px-1.5 py-0.5 rounded truncate max-w-[85px]">
                                                         {item.category}
                                                     </span>
-                                                    <div className="p-1 bg-slate-800 group-hover:bg-blue-600 text-slate-400 group-hover:text-white rounded-md transition-colors shrink-0">
-                                                        <Plus size={11} />
-                                                    </div>
+                                                    <span className="text-[8.5px] font-semibold text-slate-400 truncate">
+                                                        {item.brand}
+                                                    </span>
                                                 </div>
                                                 <div className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate" title={item.model}>
                                                     {item.model}
                                                 </div>
-                                                <div className="text-[8.5px] text-slate-400 truncate mt-0.5 font-medium">
-                                                    {item.brand} • <span className="text-emerald-400 font-bold">RM{Number(item.listPrice).toLocaleString()}</span>
+                                                <div className="flex items-center justify-between mt-1 text-[9px]">
+                                                    <span className="text-emerald-400 font-bold">RM{Number(item.listPrice).toLocaleString()}</span>
+                                                    {item.ioSpecs && Object.keys(item.ioSpecs).length > 0 && (
+                                                        <div className="flex gap-1">
+                                                            {Object.entries(item.ioSpecs as Record<string, any>).slice(0, 2).map(([type, qty]) => (
+                                                                <span key={type} className="text-[7.5px] font-bold bg-slate-900 px-1 py-0.5 rounded text-slate-300 border border-slate-800">
+                                                                    {String(qty)} {type}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                            {item.ioSpecs && Object.keys(item.ioSpecs).length > 0 && (
-                                                <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex flex-wrap gap-1">
-                                                    {Object.entries(item.ioSpecs as Record<string, any>).slice(0, 3).map(([type, qty]) => (
-                                                        <span key={type} className="text-[7px] font-bold bg-slate-900 px-1 py-0.5 rounded text-slate-300 border border-slate-800">
-                                                            {String(qty)} {type}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            <div className="p-1.5 bg-slate-800 group-hover:bg-blue-600 text-slate-400 group-hover:text-white rounded-lg transition-colors shrink-0 shadow-sm">
+                                                <Plus size={14} />
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -1874,7 +1887,8 @@ const ComponentsList: React.FC<{
     onRemove: (id: string) => void;
     onUpdateQty?: (id: string, qty: number) => void;
     onUpdateItem?: (id: string, fields: any) => void;
-}> = ({ components, onRemove, onUpdateQty, onUpdateItem }) => {
+    columns?: string;
+}> = ({ components, onRemove, onUpdateQty, onUpdateItem, columns }) => {
     const handleUpdateMisc = (id: string, currentName: string, currentPrice: number | string) => {
         const newName = prompt("Update Description:", currentName);
         if (newName === null) return;
@@ -1890,59 +1904,100 @@ const ComponentsList: React.FC<{
     };
 
     return (
-        <div className="space-y-2">
-            {components.length === 0 && <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center py-5 border border-dashed border-slate-800 rounded-2xl">No items assigned</div>}
-            {components.map(c => (
-                <div key={c.id} className="flex items-center justify-between bg-slate-950 border border-slate-800/80 p-3.5 rounded-2xl group hover:border-slate-700 transition-all">
-                    <div className="flex items-center gap-4">
-                        <div className="flex flex-col items-center gap-0.5">
-                            {onUpdateQty && (
-                                <button
-                                    onClick={() => onUpdateQty(c.id, c.quantity + 1)}
-                                    className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded-md transition-all"
-                                >
-                                    <ChevronDown size={14} className="rotate-180" />
-                                </button>
-                            )}
-                            <input
-                                type="number"
-                                min="1"
-                                value={c.quantity}
-                                onChange={(e) => onUpdateQty && onUpdateQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
-                                className="w-11 text-center text-xs font-black text-white py-0.5 bg-slate-900 rounded-lg border border-slate-800 outline-none focus:border-blue-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            {onUpdateQty && (
-                                <button
-                                    onClick={() => onUpdateQty(c.id, Math.max(1, c.quantity - 1))}
-                                    className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded-md transition-all"
-                                >
-                                    <ChevronDown size={14} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-0.5">{c.catalog?.category || 'Misc'}</div>
-                                {!c.catalogId && (
-                                    <button
-                                        onClick={() => handleUpdateMisc(c.id, c.componentName, c.snapshottedPrice)}
-                                        className="p-0.5 px-2 text-[8px] font-bold uppercase tracking-widest bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
-                                    >
-                                        Edit Details
-                                    </button>
-                                )}
-                            </div>
-                            <div className="text-xs sm:text-sm font-black text-white uppercase tracking-tight truncate">{c.componentName}</div>
-                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                                {c.catalog?.brand || 'Generic'} • RM{Number(c.snapshottedPrice).toLocaleString()} ea • <span className="text-emerald-400 font-black">RM{(Number(c.snapshottedPrice) * c.quantity).toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); onRemove(c.id); }} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                        <Trash2 size={16} />
-                    </button>
+        <div>
+            {components.length === 0 ? (
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center py-4 border border-dashed border-slate-800 rounded-xl">
+                    No items assigned
                 </div>
-            ))}
+            ) : (
+                <div className={cn("grid gap-2.5", columns || "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3")}>
+                    {components.map(c => (
+                        <div
+                            key={c.id}
+                            className="bg-slate-950/90 border border-slate-800/80 hover:border-slate-700 rounded-xl p-2.5 flex flex-col justify-between group transition-all relative hover:shadow-md"
+                        >
+                            {/* Card Top: Category, Brand, Actions */}
+                            <div className="flex items-center justify-between gap-1 mb-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-[8px] font-black uppercase text-blue-400 bg-blue-950/70 border border-blue-900/50 px-1.5 py-0.5 rounded truncate max-w-[85px]">
+                                        {c.catalog?.category || 'Misc'}
+                                    </span>
+                                    {c.catalog?.brand && (
+                                        <span className="text-[8px] font-semibold text-slate-400 truncate max-w-[75px]">
+                                            {c.catalog.brand}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    {!c.catalogId && (
+                                        <button
+                                            onClick={() => handleUpdateMisc(c.id, c.componentName, c.snapshottedPrice)}
+                                            className="p-1 text-[8px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition-all"
+                                            title="Edit Description & Price"
+                                        >
+                                            <Edit2 size={10} />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onRemove(c.id); }}
+                                        className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-all opacity-60 group-hover:opacity-100"
+                                        title="Remove component"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Card Middle: Component Name & Unit Price */}
+                            <div className="mb-2">
+                                <div className="text-xs font-bold text-white uppercase tracking-tight truncate" title={c.componentName}>
+                                    {c.componentName}
+                                </div>
+                                <div className="text-[9px] text-slate-400 mt-0.5">
+                                    RM{Number(c.snapshottedPrice).toLocaleString()} ea
+                                </div>
+                            </div>
+
+                            {/* Card Bottom: Qty Stepper on Left, Subtotal on Right */}
+                            <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/80 mt-auto">
+                                <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                                    {onUpdateQty && (
+                                        <button
+                                            onClick={() => onUpdateQty(c.id, Math.max(1, c.quantity - 1))}
+                                            className="px-1.5 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-xs font-bold"
+                                            title="Decrease quantity"
+                                        >
+                                            -
+                                        </button>
+                                    )}
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={c.quantity}
+                                        onChange={(e) => onUpdateQty && onUpdateQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-8 text-center text-[11px] font-black text-white bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    {onUpdateQty && (
+                                        <button
+                                            onClick={() => onUpdateQty(c.id, c.quantity + 1)}
+                                            className="px-1.5 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-xs font-bold"
+                                            title="Increase quantity"
+                                        >
+                                            +
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="text-right">
+                                    <span className="text-[11px] font-black text-emerald-400">
+                                        RM{(Number(c.snapshottedPrice) * c.quantity).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
