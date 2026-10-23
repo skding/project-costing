@@ -83,8 +83,13 @@ git pull origin main
 - [ ] Check Dashboard project cards: verify compact layout showing 4–5 cards per row on wide screens.
 - [ ] Open a project and navigate to **Bill of Materials**:
   - [ ] Verify System Header displays aggregate Total I/O badges.
-  - [ ] Verify the right Components/Packages catalog bar scrolls independently.
+  - [ ] Verify the right Components/Packages catalog bar scrolls independently with 1 item per row.
+  - [ ] Click **+ Auto-Calc Item**: verify live calculated quantity from 6 I/O factors (DI, DO, AI, AO, RTD, HLI) and presets.
+  - [ ] Add an item: verify quantity is initialized to calculated value and can be manually adjusted anytime.
+  - [ ] In catalog items with auto-calc configured, verify `⚡ Auto` badge and click `Recalc` button to recompute if I/O counts change.
   - [ ] Click `+` or `-` on item quantity: verify row stays in position.
+- [ ] Open **Component Library**:
+  - [ ] Click **+ Add Component**: verify `⚡ Automatic Quantity Calculation (I/O Factor Formula)` toggle, 6 factor inputs, and presets.
 - [ ] Open **Services & Rates**:
   - [ ] Edit a section and click **Save Changes**: verify section stays in position and shows "Saved!".
 - [ ] Click **Export MD** in the top action bar: verify the Markdown file downloads with company header, BOM table, and financial summary.

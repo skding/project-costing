@@ -44,7 +44,11 @@ const ComponentLibrary: React.FC = () => {
         brand: '',
         listPrice: 0,
         category: 'PLC',
-        ioSpecs: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+        ioSpecs: { 
+            DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0,
+            isAutoCalc: false,
+            ioFactors: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+        }
     });
 
     // Package editing state
@@ -102,13 +106,23 @@ const ComponentLibrary: React.FC = () => {
 
     const handleEdit = (comp: Component) => {
         setEditingId(comp.id);
+        const specs = comp.ioSpecs || {};
         setNewComp({
             model: comp.model,
             description: comp.description,
             brand: comp.brand,
-            listPrice: comp.listPrice,
+            listPrice: Number(comp.listPrice),
             category: comp.category,
-            ioSpecs: comp.ioSpecs || { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+            ioSpecs: {
+                DI: specs.DI || 0,
+                DO: specs.DO || 0,
+                AI: specs.AI || 0,
+                AO: specs.AO || 0,
+                RTD: specs.RTD || 0,
+                HLI: specs.HLI || 0,
+                isAutoCalc: Boolean(specs.isAutoCalc),
+                ioFactors: specs.ioFactors || { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+            }
         });
         setIsAdding(true);
     };
@@ -133,7 +147,11 @@ const ComponentLibrary: React.FC = () => {
             fetchData();
             setNewComp({
                 model: '', description: '', brand: '', listPrice: 0, category: 'PLC',
-                ioSpecs: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+                ioSpecs: { 
+                    DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0,
+                    isAutoCalc: false,
+                    ioFactors: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+                }
             });
         } catch (error) {
             alert('Error saving component');
@@ -249,7 +267,11 @@ const ComponentLibrary: React.FC = () => {
                             setEditingId(null);
                             setNewComp({
                                 model: '', brand: '', description: '', listPrice: 0, category: 'PLC',
-                                ioSpecs: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+                                ioSpecs: {
+                                    DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0,
+                                    isAutoCalc: false,
+                                    ioFactors: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+                                }
                             });
                             setIsAdding(true);
                         }}
@@ -401,6 +423,158 @@ const ComponentLibrary: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* Automatic Quantity Calculation based on IO Factors */}
+                                <div className="md:col-span-2 border-t border-slate-100 pt-6 mt-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean((newComp.ioSpecs as any)?.isAutoCalc)}
+                                                onChange={(e) => {
+                                                    const isAutoCalc = e.target.checked;
+                                                    const currFactors = (newComp.ioSpecs as any)?.ioFactors || { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 };
+                                                    setNewComp({
+                                                        ...newComp,
+                                                        ioSpecs: {
+                                                            ...newComp.ioSpecs,
+                                                            isAutoCalc,
+                                                            ioFactors: currFactors
+                                                        }
+                                                    });
+                                                }}
+                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <span>⚡ Automatic Quantity Calculation (I/O Factor Formula)</span>
+                                        </label>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mb-3">
+                                        When added to a BOM, initial quantity will be automatically computed: 
+                                        <span className="font-mono font-bold text-blue-600 ml-1">Total Qty = Σ (Factor × Respective I/O Quantity)</span>. The user can adjust the value anytime.
+                                    </p>
+
+                                    {(newComp.ioSpecs as any)?.isAutoCalc && (
+                                        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 space-y-3">
+                                            {/* Presets */}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Presets:</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewComp({
+                                                            ...newComp,
+                                                            ioSpecs: {
+                                                                ...newComp.ioSpecs,
+                                                                isAutoCalc: true,
+                                                                ioFactors: { DI: 0, DO: 1, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                >
+                                                    Relays (1×DO)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewComp({
+                                                            ...newComp,
+                                                            ioSpecs: {
+                                                                ...newComp.ioSpecs,
+                                                                isAutoCalc: true,
+                                                                ioFactors: { DI: 0, DO: 0, AI: 1, AO: 0, RTD: 0, HLI: 0 }
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                >
+                                                    Isolators (1×AI)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewComp({
+                                                            ...newComp,
+                                                            ioSpecs: {
+                                                                ...newComp.ioSpecs,
+                                                                isAutoCalc: true,
+                                                                ioFactors: { DI: 2, DO: 2, AI: 3, AO: 2, RTD: 3, HLI: 0 }
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                >
+                                                    Terminals (2×Digital, 3×Analog)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewComp({
+                                                            ...newComp,
+                                                            ioSpecs: {
+                                                                ...newComp.ioSpecs,
+                                                                isAutoCalc: true,
+                                                                ioFactors: { DI: 1, DO: 1, AI: 1, AO: 1, RTD: 1, HLI: 1 }
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                                                >
+                                                    1× Each I/O
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewComp({
+                                                            ...newComp,
+                                                            ioSpecs: {
+                                                                ...newComp.ioSpecs,
+                                                                isAutoCalc: true,
+                                                                ioFactors: { DI: 0, DO: 0, AI: 0, AO: 0, RTD: 0, HLI: 0 }
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-bold text-slate-400 hover:text-red-500 transition-all"
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+
+                                            {/* 6 Factor Inputs */}
+                                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                                {['DI', 'DO', 'AI', 'AO', 'RTD', 'HLI'].map(io => (
+                                                    <div key={io} className="bg-white p-2.5 rounded-xl border border-blue-100 shadow-sm">
+                                                        <label className="text-[9px] font-black uppercase tracking-wider block mb-1 text-slate-600 text-center">
+                                                            {io} Factor
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            min="0"
+                                                            placeholder="0"
+                                                            value={(newComp.ioSpecs as any)?.ioFactors?.[io] ?? 0}
+                                                            onChange={e => {
+                                                                const val = parseFloat(e.target.value) || 0;
+                                                                setNewComp({
+                                                                    ...newComp,
+                                                                    ioSpecs: {
+                                                                        ...newComp.ioSpecs,
+                                                                        isAutoCalc: true,
+                                                                        ioFactors: {
+                                                                            ...((newComp.ioSpecs as any)?.ioFactors || {}),
+                                                                            [io]: val
+                                                                        }
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center font-black text-slate-800 outline-none focus:border-blue-500"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="md:col-span-2 flex justify-end gap-3 mt-6">
                                     <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancel</button>
                                     <button type="submit" className="px-10 py-3 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-blue-100">
@@ -428,6 +602,17 @@ const ComponentLibrary: React.FC = () => {
                                         <td className="px-8 py-5">
                                             <div className="font-black text-slate-900 uppercase tracking-tight">{comp.model}</div>
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{comp.description}</div>
+                                            {comp.ioSpecs?.isAutoCalc && comp.ioSpecs?.ioFactors && (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1">
+                                                        <span>⚡ Auto-Calc:</span>
+                                                        {Object.entries(comp.ioSpecs.ioFactors as Record<string, number>)
+                                                            .filter(([_, factor]) => Number(factor) > 0)
+                                                            .map(([io, factor]) => `${factor}×${io}`)
+                                                            .join(' + ') || 'Active'}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3 text-xs font-black text-slate-600 uppercase tracking-widest">
